@@ -1,98 +1,135 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { colors } from '@/theme/colors';
+import { fontFamily } from '@/theme/fonts';
 import { Link } from 'expo-router';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+const features = [
+  {
+    icon: '🩺',
+    title: 'AI Doctor',
+    description: 'Chat with our virtual medical assistant',
+    route: '/(features)/ai-doctor',
+  },
+  {
+    icon: '📄',
+    title: 'Rx Scan',
+    description: 'Extract text from prescription handwriting',
+    route: '/(features)/rx-scan',
+  },
+  {
+    icon: '💊',
+    title: 'MedGuide',
+    description: 'Get medicine suggestions and information',
+    route: '/(features)/med-guide',
+  },
+  {
+    icon: '🧪',
+    title: 'LabSense',
+    description: 'Analyze and understand lab results',
+    route: '/(features)/lab-sense',
+  },
+  {
+    icon: '🩻',
+    title: 'ScanVision',
+    description: 'Analyze medical scan results',
+    route: '/(features)/scan-vision',
+  },
+  {
+    icon: '🤖',
+    title: 'SymptomAI',
+    description: 'AI-powered symptom checking',
+    route: '/(features)/symptom-ai',
+  },
+];
 
 export default function HomeScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Lune 🌙</Text>
+        <Text style={styles.subtitle}>Your AI-powered healthcare assistant</Text>
+      </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      <View style={styles.featuresGrid}>
+        {features.map((feature, index) => (
+          <Link 
+            key={index} 
+            href={feature.route as any}
+            asChild
+          >
+            <TouchableOpacity style={styles.featureCard}>
+              <Text style={styles.featureIcon}>{feature.icon}</Text>
+              <Text style={[styles.featureTitle, { fontFamily: fontFamily.semibold }]}>
+                {feature.title}
+              </Text>
+              <Text style={[styles.featureDescription, { fontFamily: fontFamily.regular }]}>
+                {feature.description}
+              </Text>
+            </TouchableOpacity>
+          </Link>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  stepContainer: {
-    gap: 8,
+  content: {
+    padding: 16,
+  },
+  header: {
+    marginVertical: 24,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 32,
+    fontFamily: fontFamily.bold,
+    color: colors.primary,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  subtitle: {
+    fontSize: 18,
+    fontFamily: fontFamily.regular,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  featuresGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  featureCard: {
+    width: '47%',
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  featureIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  featureTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+    marginBottom: 4,
+  },
+  featureDescription: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 });
