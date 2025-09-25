@@ -1,5 +1,7 @@
+
 import { colors } from '@/theme/colors';
 import { fontFamily } from '@/theme/fonts';
+import { showToast } from '@/utils/toast';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Checkbox from 'expo-checkbox';
 import { router } from 'expo-router';
@@ -12,128 +14,132 @@ import {
   Text,
   View,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
 import { AuthButton } from './components/AuthButton';
 import { AuthInput } from './components/AuthInput';
 import { AuthToggle } from './components/AuthToggle';
 import { OTPInput } from './components/OTPInput';
 
-export default function LoginScreen() {
-  const [isPhoneLogin, setIsPhoneLogin] = useState(false);
+
+export default function SignupScreen() {
+  const [isPhoneSignup, setIsPhoneSignup] = useState(false);
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [showOtp, setShowOtp] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
+  const handleSignup = async () => {
     try {
       setLoading(true);
-      
-      if (isPhoneLogin) {
-        if (!phone) {
-          Toast.show({
-            type: 'error',
-            text1: 'Please enter your phone number',
-          });
-          return;
-        }
-        
-        if (!showOtp) {
-          // Send OTP logic here
-          setShowOtp(true);
-          Toast.show({
-            type: 'success',
-            text1: 'OTP sent successfully',
-            text2: 'Please check your phone',
-          });
-          return;
-        }
-        
-        if (!otp) {
-          Toast.show({
-            type: 'error',
-            text1: 'Please enter the OTP',
-          });
-          return;
-        }
-        
-        // Verify OTP logic here
-      } else {
-        if (!email || !password) {
-          Toast.show({
-            type: 'error',
-            text1: 'Please fill in all fields',
-          });
-          return;
-        }
-        
-        // Email login logic here
+
+      if (!fullName) {
+        showToast.error('Error', 'Please enter your full name');
+        setLoading(false);
+        return;
       }
 
-      // Mock successful login
+      if (isPhoneSignup) {
+        if (!phone) {
+          showToast.error('Error', 'Please enter your phone number');
+          setLoading(false);
+          return;
+        }
+
+        if (!showOtp) {
+          // Send OTP logic here
+          // Simulate OTP send for demo
+                    showToast.success('Success', 'OTP sent successfully');
+          setShowOtp(true);
+          setLoading(false);
+          return;
+        }
+
+        if (!otp) {
+                    showToast.error('Error', 'Please enter the OTP');
+          setLoading(false);
+          return;
+        }
+
+        // Verify OTP logic here
+        // Mock OTP verification
+                showToast.success('Success', 'OTP verified successfully');
+      } else {
+        if (!email || !password || !confirmPassword) {
+                    showToast.error('Error', 'Please fill in all fields');
+          setLoading(false);
+          return;
+        }
+
+        if (password !== confirmPassword) {
+                    showToast.error('Error', 'Passwords do not match');
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (!acceptTerms) {
+                  showToast.error('Error', 'Please accept the terms and privacy policy');
+        setLoading(false);
+        return;
+      }
+
+      // Mock successful signup
       await AsyncStorage.setItem('userToken', 'dummy-token');
-      if (isPhoneLogin) {
+      if (isPhoneSignup) {
         await AsyncStorage.setItem('userPhone', phone);
       } else {
         await AsyncStorage.setItem('userEmail', email);
       }
 
-      Toast.show({
-        type: 'success',
-        text1: 'Welcome back!',
-        text2: 'Login successful',
-      });
-      router.replace('/(tabs)');
+            showToast.success('Success', 'Account created successfully');
+      router.replace('/auth/login');
     } catch (error) {
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to login',
-        text2: 'Please try again',
-      });
+            showToast.error('Error', 'Failed to sign up');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleForgotPassword = () => {
-    router.push('/auth/forgot-password');
-  };
-
-  const handleSignup = () => {
-    router.push('/auth/signup');
-  };
-
   const handleResendCode = () => {
     // Resend OTP logic here
-    Toast.show({
-      type: 'success',
-      text1: 'Code resent successfully',
-      text2: 'Please check your phone',
-    });
+        showToast.success('Success', 'Code resent successfully');
+  };
+
+  const handleLogin = () => {
+    router.back();
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>Welcome Back!</Text>
+          <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>
-            Sign in to continue your healthcare journey
+            Sign up to start your healthcare journey
           </Text>
         </View>
 
         <AuthToggle
-          value={isPhoneLogin}
-          onValueChange={setIsPhoneLogin}
+          value={isPhoneSignup}
+          onValueChange={setIsPhoneSignup}
           leftLabel="Email"
           rightLabel="Phone"
         />
 
         <View style={styles.form}>
-          {isPhoneLogin ? (
+          <AuthInput
+            icon="person"
+            placeholder="Full Name"
+            value={fullName}
+            onChangeText={setFullName}
+            autoCapitalize="words"
+          />
+
+          {isPhoneSignup ? (
             <>
               {!showOtp ? (
                 <AuthInput
@@ -178,37 +184,41 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry
               />
+              <AuthInput
+                icon="lock-closed"
+                placeholder="Confirm Password"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+              />
             </>
           )}
 
-          <View style={styles.options}>
-            <View style={styles.rememberMe}>
-              <Checkbox
-                value={rememberMe}
-                onValueChange={setRememberMe}
-                color={rememberMe ? colors.primary : undefined}
-              />
-              <Text style={styles.rememberMeText}>Keep me signed in</Text>
-            </View>
-            
-            {!isPhoneLogin && (
-              <Pressable onPress={handleForgotPassword}>
-                <Text style={styles.forgotPassword}>Forgot Password?</Text>
-              </Pressable>
-            )}
+          <View style={styles.termsContainer}>
+            <Checkbox
+              value={acceptTerms}
+              onValueChange={setAcceptTerms}
+              color={acceptTerms ? colors.primary : undefined}
+            />
+            <Text style={styles.termsText}>
+              I accept the{' '}
+              <Text style={styles.termsLink}>Terms of Service</Text>
+              {' '}and{' '}
+              <Text style={styles.termsLink}>Privacy Policy</Text>
+            </Text>
           </View>
 
           <AuthButton
-            title={isPhoneLogin ? (showOtp ? 'Verify OTP' : 'Send OTP') : 'Login'}
-            onPress={handleLogin}
+            title={isPhoneSignup ? (showOtp ? 'Verify & Create Account' : 'Send OTP') : 'Create Account'}
+            onPress={handleSignup}
             loading={loading}
           />
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account?</Text>
-          <Pressable onPress={handleSignup}>
-            <Text style={styles.signupText}>Sign Up</Text>
+          <Text style={styles.footerText}>Already have an account?</Text>
+          <Pressable onPress={handleLogin}>
+            <Text style={styles.loginText}>Login</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -217,6 +227,13 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  otpContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 24,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -246,26 +263,21 @@ const styles = StyleSheet.create({
   form: {
     gap: 16,
   },
-  options: {
+  termsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 24,
   },
-  rememberMe: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  rememberMeText: {
+  termsText: {
+    flex: 1,
     fontSize: 14,
     fontFamily: fontFamily.regular,
     color: colors.textSecondary,
   },
-  forgotPassword: {
-    fontSize: 14,
-    fontFamily: fontFamily.semibold,
+  termsLink: {
     color: colors.primary,
+    fontFamily: fontFamily.semibold,
   },
   otpActions: {
     flexDirection: 'row',
@@ -296,9 +308,10 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.regular,
     color: colors.textSecondary,
   },
-  signupText: {
+  loginText: {
     fontSize: 14,
     fontFamily: fontFamily.semibold,
     color: colors.primary,
   },
+  // removed duplicate otpContainer
 });
