@@ -1,24 +1,23 @@
 
+import { supabase } from '@/lib/supabaseClient';
 import { colors } from '@/theme/colors';
 import { fontFamily } from '@/theme/fonts';
-import { showToast } from '@/utils/toast';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+// Inline messages per input instead of global toast
 import Checkbox from 'expo-checkbox';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
-import { AuthButton } from './components/AuthButton';
-import { AuthInput } from './components/AuthInput';
-import { AuthToggle } from './components/AuthToggle';
-import { OTPInput } from './components/OTPInput';
-
+import { AuthButton } from '@/components/auth/AuthButton';
+import { AuthInput } from '@/components/auth/AuthInput';
+import { AuthToggle } from '@/components/auth/AuthToggle';
+import { OTPInput } from '@/components/auth/OTPInput';
 
 export default function SignupScreen() {
   const [isPhoneSignup, setIsPhoneSignup] = useState(false);
@@ -32,73 +31,87 @@ export default function SignupScreen() {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Inline field messages
+  const [fullNameMsg, setFullNameMsg] = useState<string | undefined>();
+  const [fullNameMsgType, setFullNameMsgType] = useState<'success' | 'error' | 'warning' | undefined>();
+  const [emailMsg, setEmailMsg] = useState<string | undefined>();
+  const [emailMsgType, setEmailMsgType] = useState<'success' | 'error' | 'warning' | undefined>();
+  const [passwordMsg, setPasswordMsg] = useState<string | undefined>();
+  const [passwordMsgType, setPasswordMsgType] = useState<'success' | 'error' | 'warning' | undefined>();
+  const [confirmPasswordMsg, setConfirmPasswordMsg] = useState<string | undefined>();
+  const [confirmPasswordMsgType, setConfirmPasswordMsgType] = useState<'success' | 'error' | 'warning' | undefined>();
+  const [phoneMsg, setPhoneMsg] = useState<string | undefined>();
+  const [phoneMsgType, setPhoneMsgType] = useState<'success' | 'error' | 'warning' | undefined>();
+  const [termsMsg, setTermsMsg] = useState<string | undefined>();
+  const [termsMsgType, setTermsMsgType] = useState<'success' | 'error' | 'warning' | undefined>();
+
   const handleSignup = async () => {
     try {
       setLoading(true);
+      // reset messages
+      setFullNameMsg(undefined); setFullNameMsgType(undefined);
+      setEmailMsg(undefined); setEmailMsgType(undefined);
+      setPasswordMsg(undefined); setPasswordMsgType(undefined);
+      setConfirmPasswordMsg(undefined); setConfirmPasswordMsgType(undefined);
+      setPhoneMsg(undefined); setPhoneMsgType(undefined);
+      setTermsMsg(undefined); setTermsMsgType(undefined);
 
       if (!fullName) {
-        showToast.error('Error', 'Please enter your full name');
-        setLoading(false);
+        setFullNameMsg('Please enter your full name');
+        setFullNameMsgType('error');
         return;
       }
 
       if (isPhoneSignup) {
-        if (!phone) {
-          showToast.error('Error', 'Please enter your phone number');
-          setLoading(false);
-          return;
-        }
+        setPhoneMsg("Phone signup isn't available for now, wait till we update...");
+        setPhoneMsgType('warning');
+        return;
+      }
 
-        if (!showOtp) {
-          // Send OTP logic here
-          // Simulate OTP send for demo
-                    showToast.success('Success', 'OTP sent successfully');
-          setShowOtp(true);
-          setLoading(false);
-          return;
-        }
+      if (!email || !password || !confirmPassword) {
+        if (!email) { setEmailMsg('Email is required'); setEmailMsgType('error'); }
+        if (!password) { setPasswordMsg('Password is required'); setPasswordMsgType('error'); }
+        if (!confirmPassword) { setConfirmPasswordMsg('Please confirm password'); setConfirmPasswordMsgType('error'); }
+        return;
+      }
 
-        if (!otp) {
-                    showToast.error('Error', 'Please enter the OTP');
-          setLoading(false);
-          return;
-        }
-
-        // Verify OTP logic here
-        // Mock OTP verification
-                showToast.success('Success', 'OTP verified successfully');
-      } else {
-        if (!email || !password || !confirmPassword) {
-                    showToast.error('Error', 'Please fill in all fields');
-          setLoading(false);
-          return;
-        }
-
-        if (password !== confirmPassword) {
-                    showToast.error('Error', 'Passwords do not match');
-          setLoading(false);
-          return;
-        }
+      if (password !== confirmPassword) {
+        setConfirmPasswordMsg('Passwords do not match');
+        setConfirmPasswordMsgType('error');
+        return;
       }
 
       if (!acceptTerms) {
-                  showToast.error('Error', 'Please accept the terms and privacy policy');
-        setLoading(false);
+        setTermsMsg('Please accept the terms and privacy policy');
+        setTermsMsgType('error');
         return;
       }
 
-      // Mock successful signup
-      await AsyncStorage.setItem('userToken', 'dummy-token');
-      if (isPhoneSignup) {
-        await AsyncStorage.setItem('userPhone', phone);
-      } else {
-        await AsyncStorage.setItem('userEmail', email);
+      // Supabase signup
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+
+      if (error) {
+        setEmailMsg(error.message || 'Signup failed');
+        setEmailMsgType('error');
+        return;
       }
 
-            showToast.success('Success', 'Account created successfully');
-      router.replace('/auth/login');
+      if (data?.user) {
+        setEmailMsg('Account created! Please verify your email.');
+        setEmailMsgType('success');
+        router.replace('/auth/login');
+      }
     } catch (error) {
-            showToast.error('Error', 'Failed to sign up');
+      setEmailMsg('An unexpected error occurred');
+      setEmailMsgType('error');
     } finally {
       setLoading(false);
     }
@@ -106,7 +119,8 @@ export default function SignupScreen() {
 
   const handleResendCode = () => {
     // Resend OTP logic here
-        showToast.success('Success', 'Code resent successfully');
+    setPhoneMsg('Code resent successfully');
+    setPhoneMsgType('success');
   };
 
   const handleLogin = () => {
@@ -137,6 +151,13 @@ export default function SignupScreen() {
             value={fullName}
             onChangeText={setFullName}
             autoCapitalize="words"
+            onBlur={() => {
+              if (!fullName) { setFullNameMsg('Please enter your full name'); setFullNameMsgType('error'); }
+              else { setFullNameMsg(undefined); setFullNameMsgType(undefined); }
+            }}
+            onSubmitEditing={handleSignup}
+            message={fullNameMsg}
+            messageType={fullNameMsgType}
           />
 
           {isPhoneSignup ? (
@@ -149,6 +170,13 @@ export default function SignupScreen() {
                   keyboardType="phone-pad"
                   isPhoneInput
                   autoCapitalize="none"
+                  onBlur={() => {
+                    if (!phone) { setPhoneMsg('Phone number is required'); setPhoneMsgType('error'); }
+                    else { setPhoneMsg(undefined); setPhoneMsgType(undefined); }
+                  }}
+                  onSubmitEditing={handleSignup}
+                  message={phoneMsg}
+                  messageType={phoneMsgType}
                 />
               ) : (
                 <>
@@ -176,6 +204,13 @@ export default function SignupScreen() {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                onBlur={() => {
+                  if (!email) { setEmailMsg('Email is required'); setEmailMsgType('error'); }
+                  else { setEmailMsg(undefined); setEmailMsgType(undefined); }
+                }}
+                onSubmitEditing={handleSignup}
+                message={emailMsg}
+                messageType={emailMsgType}
               />
               <AuthInput
                 icon="lock-closed"
@@ -183,6 +218,13 @@ export default function SignupScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
+                onBlur={() => {
+                  if (!password) { setPasswordMsg('Password is required'); setPasswordMsgType('error'); }
+                  else { setPasswordMsg(undefined); setPasswordMsgType(undefined); }
+                }}
+                onSubmitEditing={handleSignup}
+                message={passwordMsg}
+                messageType={passwordMsgType}
               />
               <AuthInput
                 icon="lock-closed"
@@ -190,6 +232,14 @@ export default function SignupScreen() {
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
+                onBlur={() => {
+                  if (!confirmPassword) { setConfirmPasswordMsg('Please confirm password'); setConfirmPasswordMsgType('error'); }
+                  else if (password !== confirmPassword) { setConfirmPasswordMsg('Passwords do not match'); setConfirmPasswordMsgType('error'); }
+                  else { setConfirmPasswordMsg(undefined); setConfirmPasswordMsgType(undefined); }
+                }}
+                onSubmitEditing={handleSignup}
+                message={confirmPasswordMsg}
+                messageType={confirmPasswordMsgType}
               />
             </>
           )}
@@ -213,6 +263,11 @@ export default function SignupScreen() {
             onPress={handleSignup}
             loading={loading}
           />
+          {termsMsg ? (
+            <Text style={{ color: termsMsgType === 'warning' ? colors.warning : termsMsgType === 'success' ? colors.success : colors.error, marginTop: 8, fontFamily: fontFamily.regular, fontSize: 12 }}>
+              {termsMsg}
+            </Text>
+          ) : null}
         </View>
 
         <View style={styles.footer}>

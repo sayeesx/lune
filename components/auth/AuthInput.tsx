@@ -1,7 +1,7 @@
 import { colors } from '@/theme/colors';
 import { fontFamily } from '@/theme/fonts';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 interface AuthInputProps extends TextInputProps {
@@ -9,6 +9,8 @@ interface AuthInputProps extends TextInputProps {
   error?: string;
   leftText?: string;
   isPhoneInput?: boolean;
+  message?: string;
+  messageType?: 'success' | 'error' | 'warning';
 }
 
 export const AuthInput: React.FC<AuthInputProps> = ({
@@ -25,6 +27,7 @@ export const AuthInput: React.FC<AuthInputProps> = ({
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const isPassword = secureTextEntry;
+  const inputRef = useRef<TextInput>(null);
 
   const handleFocus = (e: any) => {
     setIsFocused(true);
@@ -42,24 +45,28 @@ export const AuthInput: React.FC<AuthInputProps> = ({
         <Ionicons
           name={isPhoneInput ? 'call' : icon}
           size={20}
-          color={error ? colors.error : colors.textSecondary}
+          color={(error || (props as any).messageType === 'error') ? colors.error : colors.textSecondary}
           style={styles.icon}
         />
         {isPhoneInput && (
           <Text style={[styles.leftText, { opacity: isFocused ? 1 : 0.5 }]}>+91</Text>
         )}
         <TextInput
+          ref={inputRef}
           style={[
             styles.input,
             styles.inputWithIcon,
             isPhoneInput && styles.inputWithLeftText,
-            error && styles.inputError,
+            (error || (props as any).messageType === 'error') && styles.inputError,
             style,
           ]}
           placeholderTextColor={colors.textSecondary}
           secureTextEntry={isPassword && !isPasswordVisible}
           onFocus={handleFocus}
           onBlur={handleBlur}
+          blurOnSubmit={false}
+          // @ts-ignore - supported on RN
+          showSoftInputOnFocus={true}
           placeholder={isPhoneInput && isFocused ? '' : props.placeholder}
           {...props}
         />
@@ -69,11 +76,28 @@ export const AuthInput: React.FC<AuthInputProps> = ({
             size={20}
             color={colors.textSecondary}
             style={styles.visibilityIcon}
-            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+            onPress={() => {
+              setIsPasswordVisible(v => !v);
+              // Keep keyboard open and cursor at end after toggling
+              setTimeout(() => {
+                try {
+                  const len = String((props as any).value ?? '').length;
+                  inputRef.current?.focus();
+                  // @ts-ignore - selection is supported on RN TextInput
+                  inputRef.current?.setNativeProps?.({ selection: { start: len, end: len } });
+                } catch {}
+              }, 0);
+            }}
           />
         )}
       </View>
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {(() => {
+        const msg = (props as any).message || error;
+        const type = (props as any).messageType as 'success'|'error'|'warning'|undefined;
+        if (!msg) return null;
+        const color = type === 'success' ? colors.success : type === 'warning' ? colors.warning : colors.error;
+        return <Text style={[styles.messageText, { color }]}>{msg}</Text>;
+      })()}
     </View>
   );
 };
@@ -127,8 +151,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
     paddingHorizontal: 4,
   },
-  errorText: {
-    color: colors.error,
+  messageText: {
     fontSize: 12,
     fontFamily: fontFamily.regular,
     marginTop: 4,

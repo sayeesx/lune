@@ -36,8 +36,6 @@ export const AuthToggle: React.FC<AuthToggleProps> = ({
       stiffness: 260,
       mass: 1.2,
       overshootClamping: true,
-      // Respect reduced motion when available
-      reduceMotion: 'system',
     });
   }, [value]);
 
@@ -107,15 +105,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: PADDING,
     position: 'relative',
-    // IMPORTANT: remove overflow clipping so the slider's shadow is visible
-    // (both iOS shadow props and Android elevation can be clipped by overflow)
-    // overflow: 'hidden',
-    // Optional outer subtle shadow for the whole control (uncomment if desired)
-    // shadowColor: '#000',
-    // shadowOpacity: 0.08,
-    // shadowRadius: 8,
-    // shadowOffset: { width: 0, height: 4 },
-    // elevation: 2,
   },
   slider: {
     position: 'absolute',
