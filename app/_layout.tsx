@@ -4,8 +4,9 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import * as Font from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
+import { ActivityIndicator, View } from 'react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -17,6 +18,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const segments = useSegments();
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   useEffect(() => {
     async function loadApp() {
@@ -32,10 +34,20 @@ export default function RootLayout() {
         // Redirect to home if we have a token but we're in auth group
         router.replace('/(tabs)');
       }
+      setIsBootstrapping(false);
     }
 
     loadApp();
   }, [segments]);
+
+  if (isBootstrapping) {
+    // Prevent flashing: show a loading spinner while bootstrapping
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>

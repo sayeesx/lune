@@ -1,27 +1,37 @@
+import { supabase } from '@/lib/supabaseClient';
 import { colors } from '@/theme/colors';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [fullName, setFullName] = useState<string | null>(null);
 
   useEffect(() => {
-    loadUserEmail();
+    loadUserProfile();
   }, []);
 
-  const loadUserEmail = async () => {
-    const email = await AsyncStorage.getItem('userEmail');
-    setUserEmail(email);
+  const loadUserProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      setUserEmail(session.user.email ?? null);
+      setFullName((session.user.user_metadata?.full_name as string | undefined) ?? null);
+    }
   };
 
   const handleSignOut = async () => {
     try {
-      await AsyncStorage.multiRemove(['userToken', 'userEmail']);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      // Clear persisted session token so RootLayout redirects to auth
+      await AsyncStorage.removeItem('userToken');
       router.replace('/auth/login');
     } catch (error) {
-      Alert.alert('Error', 'Failed to sign out');
+      // Fallback: Even if Supabase signOut fails, force local logout
+      await AsyncStorage.removeItem('userToken');
+      router.replace('/auth/login');
     }
   };
 

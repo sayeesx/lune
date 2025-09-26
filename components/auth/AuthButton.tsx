@@ -1,8 +1,7 @@
 import GradientBackground from '@/components/GradientBackground';
-import { colors } from '@/theme/colors';
 import { fontFamily } from '@/theme/fonts';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
 
 interface AuthButtonProps {
   onPress: () => void;
@@ -23,15 +22,12 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
       disabled={loading}
       style={[styles.container, style]}
     >
-      <GradientBackground
-        colors={[colors.gradients.primary[0], colors.gradients.primary[1]]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.gradient}
-      >
-        <Text style={styles.text}>
-          {loading ? 'Please wait...' : title}
-        </Text>
+      <GradientBackground variant="primary" start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradient}>
+        {loading ? (
+          <ActivityIndicator size="small" color="#ffffff" />
+        ) : (
+          <Text style={styles.text}>{title}</Text>
+        )}
       </GradientBackground>
     </TouchableOpacity>
   );

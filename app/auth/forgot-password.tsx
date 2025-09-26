@@ -3,7 +3,6 @@ import { fontFamily } from '@/theme/fonts';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    Alert,
     Pressable,
     SafeAreaView,
     ScrollView,
@@ -11,31 +10,33 @@ import {
     Text,
     View,
 } from 'react-native';
-import { AuthButton } from './components/AuthButton';
-import { AuthInput } from './components/AuthInput';
+import { AuthButton } from '@/components/auth/AuthButton';
+import { AuthInput } from '@/components/auth/AuthInput';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailMsg, setEmailMsg] = useState<string | undefined>();
+  const [emailMsgType, setEmailMsgType] = useState<'success' | 'error' | 'warning' | undefined>();
 
   const handleResetPassword = async () => {
     try {
       setLoading(true);
 
       if (!email) {
-        Alert.alert('Error', 'Please enter your email address');
+        setEmailMsg('Please enter your email address');
+        setEmailMsgType('error');
         return;
       }
 
       // Reset password logic here
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
-      Alert.alert(
-        'Success',
-        'If an account exists with this email, you will receive a password reset link.',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
+      setEmailMsg('If an account exists, a reset link has been sent.');
+      setEmailMsgType('success');
+      setTimeout(() => router.back(), 800);
     } catch (error) {
-      Alert.alert('Error', 'Failed to send reset link');
+      setEmailMsg('Failed to send reset link');
+      setEmailMsgType('error');
     } finally {
       setLoading(false);
     }
@@ -63,6 +64,18 @@ export default function ForgotPasswordScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            onBlur={() => {
+              if (!email) {
+                setEmailMsg('Email is required');
+                setEmailMsgType('error');
+              } else {
+                setEmailMsg(undefined);
+                setEmailMsgType(undefined);
+              }
+            }}
+            onSubmitEditing={handleResetPassword}
+            message={emailMsg}
+            messageType={emailMsgType}
           />
 
           <AuthButton
