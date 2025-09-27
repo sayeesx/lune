@@ -5,6 +5,11 @@ export const colors = {
   primaryMedium: '#000A83',
   primaryDark: '#000439',
   primaryDarkest: '#000108',
+  // Common aliases used across the app
+  primaryAlt: '#010FCC', // alias for primaryLight
+  white: '#FFFFFF',
+  black: '#000000',
+  light: '#F2F3F4', // alias for neutral
   
   // Neutral / Light
   neutral: '#F2F3F4',
@@ -15,7 +20,8 @@ export const colors = {
   
   // Text colors
   text: '#000439',
-  textSecondary: '#000A83',
+  textPrimary: '#000000', // overridden as requested
+  textSecondary: 'rgba(0,0,0,0.6)',
   textLight: '#F2F3F4',
   
   // Status colors
@@ -49,4 +55,14 @@ export const colors = {
     border: '#F2F3F4',
     shadow: 'rgba(0, 0, 0, 0.1)',
   },
+};
+
+// Border radius scale used in styles across the app
+export const radii = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 20,
+  xl: 24,
+  full: 999,
 };
