@@ -43,7 +43,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Normal Supabase auth flow
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
+
+      // Set up auth state change listener
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        setSession(session);
+        setIsLoading(false);
+      });
+
+      // Initial load complete
       setIsLoading(false);
+
+      // Cleanup subscription
+      return () => {
+        subscription.unsubscribe();
+      };
     };
 
     initializeAuth();
