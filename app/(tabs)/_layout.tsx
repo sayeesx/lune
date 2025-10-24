@@ -1,4 +1,4 @@
-import { colors } from '@/theme/colors';
+import DockTabBar from '@/components/DockTabBar';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
@@ -6,16 +6,16 @@ import React from 'react';
 export default function TabLayout() {
   return (
     <Tabs
+      // Provide custom tabBar directly on the Tabs navigator
+      tabBar={props => <DockTabBar {...(props as any)} />}
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.tab.inactive,
-        tabBarStyle: {
-          backgroundColor: colors.tab.background,
-          borderTopColor: colors.tab.border,
-          elevation: 0,
-          shadowOpacity: 0,
-        },
         headerShown: false,
+        tabBarStyle: { 
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 1,
+          borderTopColor: '#E8EAEE',
+          height: 65,
+        }
       }}>
       <Tabs.Screen
         name="index"
