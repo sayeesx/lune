@@ -1,8 +1,17 @@
-import { Ionicons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+
+
+// Import tab bar icons
+const tabIcons = {
+  'index': require('../assets/home-icons/home.png'),
+  'chat': require('../assets/home-icons/chat.png'),
+  'reports': require('../assets/home-icons/reports.png'),
+  'profile': require('../assets/home-icons/profile.png'),
+};
+
 
 // Theme colors provided by the user (mapped)
 const dockColors = {
@@ -14,27 +23,48 @@ const dockColors = {
   deepBlue: '#032EA6'
 };
 
+
 export default function DockTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   // Animated values per route to control label visibility/translation
   const animRef = useRef<Animated.Value[]>([]);
+  const scaleAnimRef = useRef<Animated.Value[]>([]);
+
 
   // ensure array length matches routes
   if (animRef.current.length !== state.routes.length) {
     animRef.current = state.routes.map(() => new Animated.Value(0));
   }
+  
+  if (scaleAnimRef.current.length !== state.routes.length) {
+    scaleAnimRef.current = state.routes.map(() => new Animated.Value(1));
+  }
+
 
   useEffect(() => {
-    // animate each label: focused -> 1, others -> 0
+    // animate each label and icon scale: focused -> 1, others -> 0
     state.routes.forEach((_, idx) => {
-      const toValue = state.index === idx ? 1 : 0;
+      const isFocused = state.index === idx;
+      const toValue = isFocused ? 1 : 0;
+      const scaleValue = isFocused ? 1.1 : 1;
+      
+      // Label opacity animation
       Animated.timing(animRef.current[idx], {
         toValue,
-        duration: 200,
-        easing: Easing.linear,
+        duration: 250,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
         useNativeDriver: true,
+      }).start();
+      
+      // Icon scale animation with spring
+      Animated.spring(scaleAnimRef.current[idx], {
+        toValue: scaleValue,
+        useNativeDriver: true,
+        tension: 80,
+        friction: 7,
       }).start();
     });
   }, [state.index, state.routes]);
+
 
   return (
     <View style={styles.container} pointerEvents="box-none">
@@ -48,7 +78,9 @@ export default function DockTabBar({ state, descriptors, navigation }: BottomTab
               ? options.title
               : route.name;
 
+
           const isFocused = state.index === index;
+
 
           const onPress = () => {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -57,24 +89,12 @@ export default function DockTabBar({ state, descriptors, navigation }: BottomTab
             }
           };
 
-          const iconName = (() => {
-            switch (route.name) {
-              case 'index':
-                return isFocused ? 'home' : 'home-outline';
-              case 'chat':
-                return isFocused ? 'chatbubbles' : 'chatbubbles-outline';
-              case 'reports':
-                return isFocused ? 'document-text' : 'document-text-outline';
-              case 'profile':
-                return isFocused ? 'person' : 'person-outline';
-              default:
-                return 'ellipse-outline';
-            }
-          })();
 
           // animated styles for expanding container and label inside it
           const anim = animRef.current[index] || new Animated.Value(0);
+          const scaleAnim = scaleAnimRef.current[index] || new Animated.Value(1);
           const opacity = anim;
+
 
           return (
             <TouchableOpacity
@@ -93,26 +113,25 @@ export default function DockTabBar({ state, descriptors, navigation }: BottomTab
                     colors={['#2652F9', '#032EA6']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={[
-                      StyleSheet.absoluteFill,
-                      {
-                        shadowColor: "#2652F9",
-                        shadowOffset: { width: 0, height: 3 },
-                        shadowOpacity: 0.4,
-                        shadowRadius: 6,
-                        elevation: 12
-                      }
-                    ]}
+                    style={StyleSheet.absoluteFill}
                   />
                 )}
-                <View style={styles.iconWrap}>
-                  <Ionicons 
-                    name={iconName as any} 
-                    size={22} 
-                    color={isFocused ? dockColors.white : dockColors.iconInactive}
-                    style={{ marginLeft: isFocused ? -2 : 0 }}
+                <Animated.View 
+                  style={[
+                    styles.iconWrap,
+                    { transform: [{ scale: scaleAnim }] }
+                  ]}
+                >
+                  <Image
+                    source={tabIcons[route.name as keyof typeof tabIcons]}
+                    style={[
+                      styles.tabIcon,
+                      { marginLeft: isFocused ? -2 : 0 }
+                    ]}
+                    resizeMode="contain"
                   />
-                </View>
+                </Animated.View>
+
 
                 {isFocused && (
                   <Animated.Text
@@ -131,7 +150,12 @@ export default function DockTabBar({ state, descriptors, navigation }: BottomTab
   );
 }
 
+
 const styles = StyleSheet.create({
+  tabIcon: {
+    width: 22,
+    height: 22,
+  },
   container: {
     width: '100%',
     backgroundColor: '#FFFFFF',
@@ -152,22 +176,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     height: 48,
   },
-  // label that appears to the left of the icon
-  labelContainer: {
-    position: 'absolute',
-    left: -110,
-    width: 96,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingRight: 8,
-  },
-  sideLabel: {
-    color: dockColors.white,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    fontSize: 12,
-  },
   iconWrap: {
     width: 44,
     height: 44,
@@ -176,18 +184,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
-  iconWrapActive: {
-    backgroundColor: dockColors.bluePrimary,
-    transform: [{ scale: 1.08 }],
-  },
   label: {
     marginTop: 4,
     fontSize: 11,
     color: dockColors.lightGray,
+    fontFamily: 'Inter-Regular',
   },
   labelActive: {
     color: dockColors.white,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
   },
   // expanding container holds icon + label when focused
   expandingContainer: {
@@ -206,16 +211,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 24,
     shadowColor: "#2652F9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 12,
   },
   innerLabel: {
     marginLeft: 8,
     color: dockColors.white,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: 'Inter-SemiBold',
     textAlign: 'center',
   },
 });

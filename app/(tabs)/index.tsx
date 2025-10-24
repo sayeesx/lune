@@ -1,5 +1,4 @@
-import premiumIcon from "@/assets/home-icons/premium.png"
-import profileIcon from "@/assets/home-icons/profile.png"
+import NotificationModal from "@/components/NotificationModal"
 import RotatingText from "@/components/RotatingText"
 import { supabase } from "@/lib/supabaseClient"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
@@ -21,8 +20,12 @@ import {
   View,
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import premiumIcon from "../../assets/home-icons/premium.png"
+import profileIcon from "../../assets/home-icons/profile.png"
+
 
 const DEFAULT_NAME = "There"
+
 
 // Healthcare features
 const healthcareFeatures = [
@@ -70,12 +73,14 @@ const healthcareFeatures = [
   },
 ]
 
+
 const recentChats = [
   "Analyze my symptoms",
   "Check medication dosage",
   "Scan prescription label",
   "Explain lab results",
 ]
+
 
 // Memoized feature card component
 const FeatureCard = memo(
@@ -95,19 +100,29 @@ const FeatureCard = memo(
   )
 )
 
+
 FeatureCard.displayName = "FeatureCard"
+
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets()
   const [displayName, setDisplayName] = useState<string>(DEFAULT_NAME)
   const [shouldAnimate, setShouldAnimate] = useState<boolean>(true)
   const [isPro, setIsPro] = useState<boolean>(false)
+  const [isNotificationsVisible, setIsNotificationsVisible] = useState(false)
+
+
+  const handleNotificationsPress = () => {
+    setIsNotificationsVisible(true)
+  }
   const keyboardHeight = useRef(new Animated.Value(0)).current
   const rotatingTextRef = useRef<any>(null)
+
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
+
 
     const keyboardWillShow = Keyboard.addListener(showEvent, (e) => {
       Animated.timing(keyboardHeight, {
@@ -117,6 +132,7 @@ export default function HomeScreen() {
       }).start()
     })
 
+
     const keyboardWillHide = Keyboard.addListener(hideEvent, (e) => {
       Animated.timing(keyboardHeight, {
         toValue: 0,
@@ -125,55 +141,82 @@ export default function HomeScreen() {
       }).start()
     })
 
+
     return () => {
       keyboardWillShow.remove()
       keyboardWillHide.remove()
     }
-  }, [])
+  }, [keyboardHeight])
+
 
   useEffect(() => {
+    let isMounted = true;
+    
     (async () => {
       try {
-        const session = await supabase.auth.getSession()
-        if (!session.data.session) {
-          setDisplayName(DEFAULT_NAME)
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError)
+          if (isMounted) setDisplayName(DEFAULT_NAME)
           return
         }
+        
+        if (!sessionData.session) {
+          if (isMounted) setDisplayName(DEFAULT_NAME)
+          return
+        }
+
 
         // Try to get profile from database first
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("full_name, is_pro")
-          .eq("id", session.data.session.user.id)
+          .eq("id", sessionData.session.user.id)
           .single()
         
-        setIsPro(profile?.is_pro || false)
-        if (profile?.full_name?.trim()) {
-          setDisplayName(profile.full_name.trim().split(" ")[0])
-          return
+        if (profileError && profileError.code !== 'PGRST116') {
+          console.error("Profile fetch error:", profileError)
         }
+        
+        if (isMounted) {
+          setIsPro(profile?.is_pro || false)
+          
+          if (profile?.full_name?.trim()) {
+            setDisplayName(profile.full_name.trim().split(" ")[0])
+            return
+          }
 
-        // Fallback to user metadata if no profile name
-        const fullName = session.user.user_metadata?.full_name?.trim()
-        if (fullName) {
-          setDisplayName(fullName.split(" ")[0])
-          return
+
+          // Fallback to user metadata if no profile name
+          const fullName = sessionData.session.user.user_metadata?.full_name?.trim()
+          if (fullName) {
+            setDisplayName(fullName.split(" ")[0])
+            return
+          }
+
+
+          // Last resort: use email prefix
+          const email = sessionData.session.user.email
+          if (email) {
+            setDisplayName(email.split("@")[0])
+            return
+          }
+
+
+          setDisplayName(DEFAULT_NAME)
         }
-
-        // Last resort: use email prefix
-        const email = session.user.email
-        if (email) {
-          setDisplayName(email.split("@")[0])
-          return
-        }
-
-        setDisplayName(DEFAULT_NAME)
       } catch (error) {
         console.error("Error fetching user data:", error)
-        setDisplayName(DEFAULT_NAME)
+        if (isMounted) setDisplayName(DEFAULT_NAME)
       }
     })()
+    
+    return () => {
+      isMounted = false
+    }
   }, [])
+
 
   // Reset animation when screen comes into focus
   useFocusEffect(
@@ -186,11 +229,12 @@ export default function HomeScreen() {
       // Stop animation after one cycle
       const timer = setTimeout(() => {
         setShouldAnimate(false)
-      }, 4000) // Adjust timing based on your animation duration
+      }, 4000)
       
       return () => clearTimeout(timer)
     }, [])
   )
+
 
   const handleSendMessage = useCallback((text: string) => {
     if (text.trim()) {
@@ -201,6 +245,7 @@ export default function HomeScreen() {
     }
   }, [])
 
+
   const handleChatHistoryPress = useCallback((chatText: string) => {
     router.push({
       pathname: "/(tabs)/chat",
@@ -208,25 +253,31 @@ export default function HomeScreen() {
     })
   }, [])
 
+
   const handlePremiumPress = useCallback(() => {
     router.push("/(features)/premium")
   }, [])
+
 
   const handleProfilePress = useCallback(() => {
     router.push("/(tabs)/profile")
   }, [])
 
+
   const handleSeeAllPress = useCallback(() => {
     router.push("/(tabs)/chat")
   }, [])
+
 
   const handleFeaturePress = useCallback((route: string) => {
     router.push(route as any)
   }, [])
 
+
   return (
     <View style={styles.outerContainer}>
       <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+
 
       <ScrollView
         style={styles.scrollContainer}
@@ -253,16 +304,31 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.premiumButton}
                 onPress={handlePremiumPress}
-              accessibilityRole="button"
-              accessibilityLabel="Try premium"
-            >
-              <LinearGradient colors={["#2652F9", "#032EA6"]} style={styles.premiumGradient}>
-                <Image source={premiumIcon} style={styles.premiumIcon} resizeMode="contain" />
-                <Text style={styles.premiumText}>Try Premium</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                accessibilityRole="button"
+                accessibilityLabel="Try premium"
+              >
+                <LinearGradient colors={["#2652F9", "#032EA6"]} style={styles.premiumGradient}>
+                  <Image source={premiumIcon} style={styles.premiumIcon} resizeMode="contain" />
+                  <Text style={styles.premiumText}>Try Premium</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={handleNotificationsPress}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications"
+            >
+              <Image source={require("../../assets/home-icons/notification.png")} style={styles.notificationIcon} resizeMode="contain" />
+            </TouchableOpacity>
           </View>
+
+
+          <NotificationModal
+            isVisible={isNotificationsVisible}
+            onClose={() => setIsNotificationsVisible(false)}
+          />
+
 
           <View style={styles.greetingSection}>
             <View style={styles.greetingRow}>
@@ -270,7 +336,7 @@ export default function HomeScreen() {
               {shouldAnimate ? (
                 <RotatingText
                   ref={rotatingTextRef}
-                  texts={["there", displayName]}
+                  texts={["There", displayName]}
                   style={styles.greeting}
                   rotationInterval={2000}
                   loop={false}
@@ -280,9 +346,10 @@ export default function HomeScreen() {
                 <Text style={styles.greeting}>{displayName}</Text>
               )}
             </View>
-            <Text style={styles.tagline}>Make anything you want, whenever you want.</Text>
+            <Text style={styles.tagline}>Lune, An AI That Understands Your Health..</Text>
           </View>
         </View>
+
 
         {/* Feature Cards Grid */}
         <View style={styles.featuresSection}>
@@ -296,6 +363,7 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
+
 
         {/* Ask Lune AI Section */}
         <View style={styles.chatHistorySection}>
@@ -336,6 +404,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+
         {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -343,9 +412,29 @@ export default function HomeScreen() {
   )
 }
 
+
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
+
 const styles = StyleSheet.create({
+  notificationButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F6FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+    shadowColor: "#100F15",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  notificationIcon: {
+    width: 24,
+    height: 24,
+  },
   profileIcon: {
     width: 24,
     height: 24,
@@ -357,10 +446,6 @@ const styles = StyleSheet.create({
   featureIcon: {
     width: 32,
     height: 32,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   outerContainer: {
     flex: 1,
@@ -396,10 +481,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#E8EAEE",
+    shadowColor: "#100F15",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   premiumButton: {
     borderRadius: 20,
     overflow: "hidden",
+    shadowColor: "#2652F9",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   premiumGradient: {
     flexDirection: "row",
@@ -450,9 +545,9 @@ const styles = StyleSheet.create({
     borderColor: "#E8EAEE",
     shadowColor: "#100F15",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
-    elevation: 3,
+    elevation: 4,
     marginBottom: Math.max(16, screenHeight * 0.02),
     marginHorizontal: 4,
   },
@@ -475,6 +570,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F6FA",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#100F15",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   cardTitle: {
     fontSize: screenWidth * 0.04,
@@ -523,9 +623,9 @@ const styles = StyleSheet.create({
     borderColor: "#E8EAEE",
     shadowColor: "#100F15",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   chatPillText: {
     fontSize: screenWidth * 0.035,
@@ -536,11 +636,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderRadius: 16,
     overflow: "hidden",
-    elevation: 2,
     shadowColor: "#2652F9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
   chatPremiumGradient: {
     width: "100%",
