@@ -98,9 +98,14 @@ export default function LoginScreen() {
       if (data?.user) {
         setPasswordMsg('Login successful');
         setPasswordMsgType('success');
-        // The session is automatically handled by Supabase auth state change
-        // No need to manually navigate - the auth state change will handle it
-        // router.replace('/(tabs)'); // Remove this line
+        
+        // Store user token if remember me is checked
+        if (rememberMe) {
+          await AsyncStorage.setItem('userToken', data.session?.access_token || '');
+        }
+        
+        // Navigate to tabs immediately after successful login
+        router.replace('/(tabs)');
       }
     } catch (error) {
       setPasswordMsg('An unexpected error occurred');

@@ -1,6 +1,9 @@
-
+import premiumIcon from "@/assets/home-icons/premium.png"
+import profileIcon from "@/assets/home-icons/profile.png"
+import RotatingText from "@/components/RotatingText"
 import { supabase } from "@/lib/supabaseClient"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
+import { useFocusEffect } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
 import { router } from "expo-router"
 import { StatusBar } from "expo-status-bar"
@@ -8,6 +11,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react"
 import {
   Animated,
   Dimensions,
+  Image,
   Keyboard,
   Platform,
   ScrollView,
@@ -18,48 +22,48 @@ import {
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
-const DEFAULT_NAME = "there"
+const DEFAULT_NAME = "There"
 
 // Healthcare features
 const healthcareFeatures = [
   {
     key: "ai-doctor",
-    icon: "doctor",
+    iconSource: require("@/assets/feature-icons/aidoctor.png"),
     title: "AI Doctor",
     description: "Smart medical consultations",
     route: "/(features)/ai-doctor",
   },
   {
     key: "lab-sense",
-    icon: "flask",
+    iconSource: require("@/assets/feature-icons/labsense.png"),
     title: "LabSense",
     description: "Lab result analysis",
     route: "/(features)/lab-sense",
   },
   {
     key: "med-guide",
-    icon: "book-open-page-variant",
+    iconSource: require("@/assets/feature-icons/medguide.png"),
     title: "MedGuide",
     description: "Medication guidance",
     route: "/(features)/med-guide",
   },
   {
     key: "medical-translation",
-    icon: "translate",
+    iconSource: require("@/assets/feature-icons/medtranslation.png"),
     title: "Medical Translation",
     description: "Translate medical terms",
     route: "/(features)/medical-translation",
   },
   {
     key: "rx-scan",
-    icon: "barcode-scan",
+    iconSource: require("@/assets/feature-icons/rxscan.png"),
     title: "Rx Scan",
-    description: "Prescription OCR scan",
+    description: "Scan prescriptions",
     route: "/(features)/rx-scan",
   },
   {
     key: "scan-vision",
-    icon: "eye-outline",
+    iconSource: require("@/assets/feature-icons/scanvision.png"),
     title: "ScanVision",
     description: "Medical image analysis",
     route: "/(features)/scan-vision",
@@ -78,9 +82,9 @@ const FeatureCard = memo(
   ({ feature, onPress }: { feature: typeof healthcareFeatures[0]; onPress: () => void }) => (
     <TouchableOpacity style={styles.featureCard} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.cardHeader}>
-        <LinearGradient colors={["#2652F9", "#032EA6"]} style={styles.cardIcon}>
-          <MaterialCommunityIcons name={feature.icon as any} size={24} color="#FFFFFF" />
-        </LinearGradient>
+        <View style={styles.cardIcon}>
+          <Image source={feature.iconSource} style={styles.featureIcon} resizeMode="contain" />
+        </View>
         <View style={styles.arrowButton}>
           <MaterialCommunityIcons name="chevron-right" size={16} color="#9199B1" />
         </View>
@@ -96,7 +100,10 @@ FeatureCard.displayName = "FeatureCard"
 export default function HomeScreen() {
   const insets = useSafeAreaInsets()
   const [displayName, setDisplayName] = useState<string>(DEFAULT_NAME)
+  const [shouldAnimate, setShouldAnimate] = useState<boolean>(true)
+  const [isPro, setIsPro] = useState<boolean>(false)
   const keyboardHeight = useRef(new Animated.Value(0)).current
+  const rotatingTextRef = useRef<any>(null)
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
@@ -125,34 +132,65 @@ export default function HomeScreen() {
   }, [])
 
   useEffect(() => {
-    ;(async () => {
+    (async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession()
-        const fullName = (session?.user?.user_metadata?.full_name as string | undefined)?.trim()
-        if (fullName && fullName.length > 0) {
-          setDisplayName(fullName.split(" ")[0])
-        } else {
-          const email = session?.user?.email ?? ""
-          if (email) setDisplayName(email.split("@")[0])
+        const session = await supabase.auth.getSession()
+        if (!session.data.session) {
+          setDisplayName(DEFAULT_NAME)
+          return
         }
 
-        const userId = session?.user?.id
-        if (userId) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("id", userId)
-            .maybeSingle()
-          const pName = (profile?.full_name as string | undefined)?.trim()
-          if (pName && pName.length > 0) setDisplayName(pName.split(" ")[0])
+        // Try to get profile from database first
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, is_pro")
+          .eq("id", session.data.session.user.id)
+          .single()
+        
+        setIsPro(profile?.is_pro || false)
+        if (profile?.full_name?.trim()) {
+          setDisplayName(profile.full_name.trim().split(" ")[0])
+          return
         }
+
+        // Fallback to user metadata if no profile name
+        const fullName = session.user.user_metadata?.full_name?.trim()
+        if (fullName) {
+          setDisplayName(fullName.split(" ")[0])
+          return
+        }
+
+        // Last resort: use email prefix
+        const email = session.user.email
+        if (email) {
+          setDisplayName(email.split("@")[0])
+          return
+        }
+
+        setDisplayName(DEFAULT_NAME)
       } catch (error) {
         console.error("Error fetching user data:", error)
+        setDisplayName(DEFAULT_NAME)
       }
     })()
   }, [])
+
+  // Reset animation when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      setShouldAnimate(true)
+      if (rotatingTextRef.current) {
+        rotatingTextRef.current.reset()
+      }
+      
+      // Stop animation after one cycle
+      const timer = setTimeout(() => {
+        setShouldAnimate(false)
+      }, 4000) // Adjust timing based on your animation duration
+      
+      return () => clearTimeout(timer)
+    }, [])
+  )
 
   const handleSendMessage = useCallback((text: string) => {
     if (text.trim()) {
@@ -207,25 +245,41 @@ export default function HomeScreen() {
                 accessibilityLabel="Profile"
               >
                 <View style={styles.avatar}>
-                  <MaterialCommunityIcons name="account" size={24} color="#9199B1" />
+                  <Image source={profileIcon} style={styles.profileIcon} resizeMode="contain" />
                 </View>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.premiumButton}
-              onPress={handlePremiumPress}
+            {!isPro && (
+              <TouchableOpacity
+                style={styles.premiumButton}
+                onPress={handlePremiumPress}
               accessibilityRole="button"
               accessibilityLabel="Try premium"
             >
               <LinearGradient colors={["#2652F9", "#032EA6"]} style={styles.premiumGradient}>
-                <MaterialCommunityIcons name="crown" size={16} color="#FFFFFF" />
-                <Text style={styles.premiumText}>Try premium</Text>
+                <Image source={premiumIcon} style={styles.premiumIcon} resizeMode="contain" />
+                <Text style={styles.premiumText}>Try Premium</Text>
               </LinearGradient>
             </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.greetingSection}>
-            <Text style={styles.greeting}>Hello {displayName}, 👋</Text>
+            <View style={styles.greetingRow}>
+              <Text style={styles.greeting}>Hello </Text>
+              {shouldAnimate ? (
+                <RotatingText
+                  ref={rotatingTextRef}
+                  texts={["there", displayName]}
+                  style={styles.greeting}
+                  rotationInterval={2000}
+                  loop={false}
+                  auto={true}
+                />
+              ) : (
+                <Text style={styles.greeting}>{displayName}</Text>
+              )}
+            </View>
             <Text style={styles.tagline}>Make anything you want, whenever you want.</Text>
           </View>
         </View>
@@ -292,6 +346,22 @@ export default function HomeScreen() {
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
 const styles = StyleSheet.create({
+  profileIcon: {
+    width: 24,
+    height: 24,
+  },
+  premiumIcon: {
+    width: 18,
+    height: 18,
+  },
+  featureIcon: {
+    width: 32,
+    height: 32,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
   outerContainer: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -326,11 +396,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#E8EAEE",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   premiumButton: {
     borderRadius: 20,
@@ -351,11 +416,15 @@ const styles = StyleSheet.create({
   greetingSection: {
     marginBottom: screenHeight * 0.01,
   },
+  greetingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
   greeting: {
     fontSize: screenWidth * 0.07,
     fontFamily: "Inter-Bold",
     color: "#100F15",
-    marginBottom: 4,
   },
   tagline: {
     fontSize: screenWidth * 0.04,
@@ -396,8 +465,6 @@ const styles = StyleSheet.create({
   cardIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F0F3FF",
     alignItems: "center",
     justifyContent: "center",
   },

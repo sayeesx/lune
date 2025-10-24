@@ -6,9 +6,103 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import 'react-native-reanimated';
+import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 
 import { useAuth } from '@/context/auth';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+
+const toastConfig = {
+  success: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{
+        borderLeftColor: '#4CAF50',
+        backgroundColor: '#FFFFFF',
+        height: 70,
+        borderRadius: 12,
+        marginHorizontal: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
+      }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#100F15',
+      }}
+      text2Style={{
+        fontSize: 13,
+        fontWeight: '400',
+        color: '#4A4A4D',
+        lineHeight: 18,
+      }}
+      text2NumberOfLines={3}
+    />
+  ),
+  error: (props: any) => (
+    <ErrorToast
+      {...props}
+      style={{
+        borderLeftColor: '#F44336',
+        backgroundColor: '#FFFFFF',
+        height: 70,
+        borderRadius: 12,
+        marginHorizontal: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
+      }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#100F15',
+      }}
+      text2Style={{
+        fontSize: 13,
+        fontWeight: '400',
+        color: '#4A4A4D',
+        lineHeight: 18,
+      }}
+      text2NumberOfLines={3}
+    />
+  ),
+  info: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{
+        borderLeftColor: '#2652F9',
+        backgroundColor: '#FFFFFF',
+        height: 70,
+        borderRadius: 12,
+        marginHorizontal: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+        elevation: 6,
+      }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#100F15',
+      }}
+      text2Style={{
+        fontSize: 13,
+        fontWeight: '400',
+        color: '#4A4A4D',
+        lineHeight: 18,
+      }}
+      text2NumberOfLines={3}
+    />
+  ),
+};
 
 export const unstable_settings = {
   anchor: '(tabs)',
@@ -68,6 +162,7 @@ export default function RootLayout() {
         <Stack.Screen name="auth/forgot-password" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
+      <Toast config={toastConfig} />
     </ThemeProvider>
   );
 }
