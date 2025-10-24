@@ -1,22 +1,22 @@
-import { supabase } from '@/lib/supabaseClient';
-import { colors } from '@/theme/colors';
-import { fontFamily } from '@/theme/fonts';
-import Checkbox from 'expo-checkbox'; // ✅ Added import
-import { router } from 'expo-router';
-import React, { useState } from 'react';
-import {
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthButton } from '@/components/auth/AuthButton';
 import { AuthInput } from '@/components/auth/AuthInput';
 import { AuthToggle } from '@/components/auth/AuthToggle';
 import { OTPInput } from '@/components/auth/OTPInput';
+import { supabase } from '@/lib/supabaseClient';
+import { colors } from '@/theme/colors';
+import { fontFamily } from '@/theme/fonts';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Checkbox from 'expo-checkbox'; // ✅ Added import
+import { router } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 
 export default function LoginScreen() {
   const [isPhoneLogin, setIsPhoneLogin] = useState(false);
@@ -72,11 +72,20 @@ export default function LoginScreen() {
         const msg = (error as any)?.message || '';
         const isEmailNotConfirmed = msg.toLowerCase().includes('confirm');
         if (isEmailNotConfirmed) {
-          // Bypass for now: treat as success and set a demo token if session is absent
-          setPasswordMsg('Email not confirmed — continuing for now');
+          // For development: bypass email confirmation
+          setPasswordMsg('Email not confirmed — continuing for development');
           setPasswordMsgType('warning');
-          const token = (data as any)?.session?.access_token || 'demo-token';
-          await AsyncStorage.setItem('userToken', token);
+          
+          // Create a temporary session-like object and store it
+          const tempAuth = {
+            user: { id: 'demo-user', email: email },
+            session: { access_token: 'demo-token' }
+          };
+          
+          // Store in AsyncStorage to simulate authenticated state
+          await AsyncStorage.setItem('tempAuth', JSON.stringify(tempAuth));
+          
+          // Navigate to tabs
           router.replace('/(tabs)');
           return;
         } else {
@@ -89,11 +98,9 @@ export default function LoginScreen() {
       if (data?.user) {
         setPasswordMsg('Login successful');
         setPasswordMsgType('success');
-        // Persist token so RootLayout redirects to tabs and stays there
-        if (data.session?.access_token) {
-          await AsyncStorage.setItem('userToken', data.session.access_token);
-        }
-        router.replace('/(tabs)');
+        // The session is automatically handled by Supabase auth state change
+        // No need to manually navigate - the auth state change will handle it
+        // router.replace('/(tabs)'); // Remove this line
       }
     } catch (error) {
       setPasswordMsg('An unexpected error occurred');
