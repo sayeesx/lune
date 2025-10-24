@@ -411,7 +411,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <Text style={styles.userName}>{fullName || 'Welcome'}</Text>
-          <Text style={styles.userSubtitle}>AI Health Explorer</Text>
+          <Text style={styles.userSubtitle}>Lune : AI That Understands Your Health.</Text>
         </View>
 
         {/* Health Summary Card */}
