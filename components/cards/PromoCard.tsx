@@ -16,8 +16,7 @@ export function PromoCard({ item, loading, onPress }: { item: Promo; loading: bo
   if (loading) {
     return (
       <View style={[styles.card, styles.skeletonCard]}> 
-        <View style={[styles.skeleton, { width: 140, height: 16, marginBottom: 8 }]} />
-        <View style={[styles.skeleton, { width: 180, height: 12 }]} />
+        <View style={styles.skeletonImage} />
       </View>
     );
   }
@@ -55,8 +54,9 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 6,
   },
-  imageWrap: { width: '100%', height: 200, borderRadius: radii.lg, overflow: 'hidden', backgroundColor: '#F2F3F5' },
+  imageWrap: { width: '100%', height: 160, borderRadius: radii.lg, overflow: 'hidden', backgroundColor: '#F2F3F5' },
   image: { width: '100%', height: '100%' },
   skeletonCard: { backgroundColor: '#FAFAFB', borderColor: 'rgba(0,0,0,0.06)' },
   skeleton: { backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 6 },
+  skeletonImage: { width: '100%', height: 160, borderRadius: radii.lg, backgroundColor: 'rgba(0,0,0,0.06)' },
 });

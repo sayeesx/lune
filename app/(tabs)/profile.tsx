@@ -3,7 +3,7 @@ import { getMyProfile, updateMyProfile, type Profile } from '@/lib/profiles';
 import { colors } from '@/theme/colors';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, TextInput, ScrollView, Alert } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, TextInput, ScrollView, Alert, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
@@ -68,10 +68,25 @@ export default function ProfileScreen() {
     }
   };
 
+  const initials = (fullName || email || '').split(' ').map(s => s[0]).join('').toUpperCase().slice(0,2) || 'U';
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, gap: 16 }}>
+      {/* Avatar + Actions */}
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Profile</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {profile?.profile_picture_url ? (
+            <Image source={{ uri: profile.profile_picture_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
+          <View>
+            <Text style={styles.title}>Profile</Text>
+            <Text style={styles.subtitle}>{email || '—'}</Text>
+          </View>
+        </View>
         <View style={{ flexDirection: 'row', gap: 12 }}>
           {editing ? (
             <TouchableOpacity style={[styles.primaryBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
@@ -88,13 +103,21 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      {/* Details */}
+      {/* Personal */}
       <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Personal</Text>
+        <View style={{ height: 8 }} />
         <Field label="Full name" value={fullName} onChange={setFullName} editable={editing} placeholder="Your full name" />
-        <Field label="Email" value={email} onChange={setEmail} editable={editing} placeholder="you@example.com" keyboardType="email-address" />
-        <Field label="Phone" value={phone} onChange={setPhone} editable={editing} placeholder="+91 98765 43210" keyboardType="phone-pad" />
         <Field label="Date of birth" value={dob} onChange={setDob} editable={editing} placeholder="YYYY-MM-DD" />
         <Field label="Gender" value={gender} onChange={setGender} editable={editing} placeholder="Male/Female/Other" />
+      </View>
+
+      {/* Contact */}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Contact</Text>
+        <View style={{ height: 8 }} />
+        <Field label="Email" value={email} onChange={setEmail} editable={editing} placeholder="you@example.com" keyboardType="email-address" />
+        <Field label="Phone" value={phone} onChange={setPhone} editable={editing} placeholder="+91 98765 43210" keyboardType="phone-pad" />
         <Field label="Location" value={location} onChange={setLocation} editable={editing} placeholder="City, Country" />
       </View>
     </ScrollView>
@@ -131,14 +154,16 @@ function Field({ label, value, onChange, editable, placeholder, keyboardType }: 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  title: { fontSize: 22, fontFamily: 'Inter-Bold', color: colors.textPrimary },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  title: { fontSize: 20, fontFamily: 'Inter-Bold', color: colors.textPrimary },
+  subtitle: { fontSize: 12, fontFamily: 'Inter-Regular', color: 'rgba(0,0,0,0.6)' },
   card: {
     backgroundColor: '#FFF',
     borderRadius: 16,
     padding: 16,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 3,
   },
+  sectionTitle: { fontFamily: 'Inter-Bold', fontSize: 14, color: colors.textPrimary },
   label: { fontFamily: 'Inter-Medium', fontSize: 12, color: 'rgba(0,0,0,0.6)', marginBottom: 6 },
   value: { fontFamily: 'Inter-Medium', fontSize: 14, color: colors.textPrimary },
   input: {
@@ -157,4 +182,7 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: colors.primary, fontFamily: 'Inter-Bold' },
   dangerBtn: { backgroundColor: '#FFECEC', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
   dangerBtnText: { color: '#FF3B30', fontFamily: 'Inter-Bold' },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#EEE' },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: 'Inter-Bold', fontSize: 18, color: colors.textPrimary },
 });

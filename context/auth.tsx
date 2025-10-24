@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session } from '@supabase/supabase-js';
-import { router } from 'expo-router';
 import { createContext, useContext, useEffect, useState } from 'react';
 
 interface AuthContextType {
@@ -21,19 +21,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initializeAuth = async () => {
+      // First check for temp auth (for development bypass)
+      const tempAuth = await AsyncStorage.getItem('tempAuth');
+      if (tempAuth) {
+        try {
+          const parsed = JSON.parse(tempAuth);
+          // Create a mock session object
+          const mockSession = {
+            access_token: parsed.session.access_token,
+            user: parsed.user,
+          } as any;
+          setSession(mockSession);
+          setIsLoading(false);
+          return;
+        } catch (e) {
+          // If parsing fails, continue with normal flow
+        }
+      }
+
+      // Normal Supabase auth flow
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       setIsLoading(false);
-    });
+    };
+
+    initializeAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      
-      // Redirect based on auth state
-      if (!session) {
-        router.replace('/auth/login');
-      }
     });
 
     return () => {
