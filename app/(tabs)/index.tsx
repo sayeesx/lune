@@ -1,5 +1,4 @@
 import NotificationModal from "@/components/NotificationModal"
-import RotatingText from "@/components/RotatingText"
 import { supabase } from "@/lib/supabaseClient"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { useFocusEffect } from "@react-navigation/native"
@@ -23,9 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import premiumIcon from "../../assets/home-icons/premium.png"
 import profileIcon from "../../assets/home-icons/profile.png"
 
-
 const DEFAULT_NAME = "There"
-
 
 // Healthcare features
 const healthcareFeatures = [
@@ -73,14 +70,12 @@ const healthcareFeatures = [
   },
 ]
 
-
 const recentChats = [
   "Analyze my symptoms",
   "Check medication dosage",
   "Scan prescription label",
   "Explain lab results",
 ]
-
 
 // Memoized feature card component
 const FeatureCard = memo(
@@ -100,29 +95,83 @@ const FeatureCard = memo(
   )
 )
 
-
 FeatureCard.displayName = "FeatureCard"
 
+// Animated greeting component
+const AnimatedGreeting = ({ displayName, shouldStartAnimation }: { displayName: string; shouldStartAnimation: boolean }) => {
+  const slideAnim = useRef(new Animated.Value(0)).current
+  const [hasAnimated, setHasAnimated] = useState(false)
+
+  useEffect(() => {
+    if (shouldStartAnimation && displayName !== DEFAULT_NAME && !hasAnimated) {
+      // Animate from "There" to the user's name
+      Animated.sequence([
+        Animated.delay(500), // Wait 500ms after page loads
+        Animated.timing(slideAnim, {
+          toValue: -1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => setHasAnimated(true))
+    }
+  }, [shouldStartAnimation, displayName, hasAnimated])
+
+  const translateY = slideAnim.interpolate({
+    inputRange: [-1, 0],
+    outputRange: [-40, 0],
+  })
+
+  return (
+    <View style={styles.greetingRow}>
+      <Text style={styles.greeting}>Hello </Text>
+      <View style={styles.nameContainer}>
+        <Animated.View style={[styles.nameSlider, { transform: [{ translateY }] }]}>
+          <Text style={styles.greeting}>{DEFAULT_NAME}</Text>
+          <Text style={[styles.greeting, styles.userName]}>{displayName}</Text>
+        </Animated.View>
+      </View>
+    </View>
+  )
+}
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets()
   const [displayName, setDisplayName] = useState<string>(DEFAULT_NAME)
-  const [shouldAnimate, setShouldAnimate] = useState<boolean>(true)
   const [isPro, setIsPro] = useState<boolean>(false)
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false)
-
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [shouldStartAnimation, setShouldStartAnimation] = useState<boolean>(false)
 
   const handleNotificationsPress = () => {
     setIsNotificationsVisible(true)
   }
   const keyboardHeight = useRef(new Animated.Value(0)).current
-  const rotatingTextRef = useRef<any>(null)
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const spinValue = useRef(new Animated.Value(0)).current
 
+  // Spinner animation - only runs during loading
+  useEffect(() => {
+    if (isLoading) {
+      const spin = Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      )
+      spin.start()
+      return () => spin.stop()
+    }
+  }, [isLoading])
+
+  const spinInterpolate = spinValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  })
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
-
 
     const keyboardWillShow = Keyboard.addListener(showEvent, (e) => {
       Animated.timing(keyboardHeight, {
@@ -132,7 +181,6 @@ export default function HomeScreen() {
       }).start()
     })
 
-
     const keyboardWillHide = Keyboard.addListener(hideEvent, (e) => {
       Animated.timing(keyboardHeight, {
         toValue: 0,
@@ -141,34 +189,72 @@ export default function HomeScreen() {
       }).start()
     })
 
-
     return () => {
       keyboardWillShow.remove()
       keyboardWillHide.remove()
     }
   }, [keyboardHeight])
 
-
   useEffect(() => {
-    let isMounted = true;
+    let isMounted = true
     
-    (async () => {
+    const loadData = async () => {
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        // Preload all images
+        const imagesToPreload = [
+          premiumIcon,
+          profileIcon,
+          require("../../assets/home-icons/notification.png"),
+          ...healthcareFeatures.map(f => f.iconSource),
+        ]
+
+        const imagePromises = imagesToPreload.map((imageSource) =>
+          Image.prefetch(Image.resolveAssetSource(imageSource).uri).catch(() => {})
+        )
+
+        // Fetch session data
+        const sessionPromise = supabase.auth.getSession()
+
+        // Wait for both images and session
+        const [sessionResult] = await Promise.all([
+          sessionPromise,
+          ...imagePromises,
+        ])
+
+        const { data: sessionData, error: sessionError } = sessionResult
         
         if (sessionError) {
           console.error("Session error:", sessionError)
-          if (isMounted) setDisplayName(DEFAULT_NAME)
+          if (isMounted) {
+            setDisplayName(DEFAULT_NAME)
+            setIsLoading(false)
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              setShouldStartAnimation(true)
+            })
+          }
           return
         }
         
         if (!sessionData.session) {
-          if (isMounted) setDisplayName(DEFAULT_NAME)
+          if (isMounted) {
+            setDisplayName(DEFAULT_NAME)
+            setIsLoading(false)
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              setShouldStartAnimation(true)
+            })
+          }
           return
         }
 
-
-        // Try to get profile from database first
+        // Try to get profile from database
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("full_name, is_pro")
@@ -184,57 +270,55 @@ export default function HomeScreen() {
           
           if (profile?.full_name?.trim()) {
             setDisplayName(profile.full_name.trim().split(" ")[0])
-            return
+          } else {
+            // Fallback to user metadata if no profile name
+            const fullName = sessionData.session.user.user_metadata?.full_name?.trim()
+            if (fullName) {
+              setDisplayName(fullName.split(" ")[0])
+            } else {
+              // Last resort: use email prefix
+              const email = sessionData.session.user.email
+              if (email) {
+                setDisplayName(email.split("@")[0])
+              } else {
+                setDisplayName(DEFAULT_NAME)
+              }
+            }
           }
 
-
-          // Fallback to user metadata if no profile name
-          const fullName = sessionData.session.user.user_metadata?.full_name?.trim()
-          if (fullName) {
-            setDisplayName(fullName.split(" ")[0])
-            return
-          }
-
-
-          // Last resort: use email prefix
-          const email = sessionData.session.user.email
-          if (email) {
-            setDisplayName(email.split("@")[0])
-            return
-          }
-
-
-          setDisplayName(DEFAULT_NAME)
+          // Show content after everything is loaded
+          setIsLoading(false)
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            // Start the greeting animation after fade-in completes
+            setShouldStartAnimation(true)
+          })
         }
       } catch (error) {
         console.error("Error fetching user data:", error)
-        if (isMounted) setDisplayName(DEFAULT_NAME)
+        if (isMounted) {
+          setDisplayName(DEFAULT_NAME)
+          setIsLoading(false)
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            setShouldStartAnimation(true)
+          })
+        }
       }
-    })()
+    }
+
+    loadData()
     
     return () => {
       isMounted = false
     }
   }, [])
-
-
-  // Reset animation when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      setShouldAnimate(true)
-      if (rotatingTextRef.current) {
-        rotatingTextRef.current.reset()
-      }
-      
-      // Stop animation after one cycle
-      const timer = setTimeout(() => {
-        setShouldAnimate(false)
-      }, 4000)
-      
-      return () => clearTimeout(timer)
-    }, [])
-  )
-
 
   const handleSendMessage = useCallback((text: string) => {
     if (text.trim()) {
@@ -245,7 +329,6 @@ export default function HomeScreen() {
     }
   }, [])
 
-
   const handleChatHistoryPress = useCallback((chatText: string) => {
     router.push({
       pathname: "/(tabs)/chat",
@@ -253,31 +336,40 @@ export default function HomeScreen() {
     })
   }, [])
 
-
   const handlePremiumPress = useCallback(() => {
     router.push("/(features)/premium")
   }, [])
-
 
   const handleProfilePress = useCallback(() => {
     router.push("/(tabs)/profile")
   }, [])
 
-
   const handleSeeAllPress = useCallback(() => {
     router.push("/(tabs)/chat")
   }, [])
-
 
   const handleFeaturePress = useCallback((route: string) => {
     router.push(route as any)
   }, [])
 
+  // Loading screen
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+        <Animated.View style={[styles.spinnerContainer, { transform: [{ rotate: spinInterpolate }] }]}>
+          <View style={styles.spinner}>
+            <View style={styles.spinnerInner} />
+          </View>
+        </Animated.View>
+        <Text style={styles.loadingText}>Loading Lune...</Text>
+      </View>
+    )
+  }
 
   return (
-    <View style={styles.outerContainer}>
+    <Animated.View style={[styles.outerContainer, { opacity: fadeAnim }]}>
       <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
-
 
       <ScrollView
         style={styles.scrollContainer}
@@ -323,33 +415,16 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-
           <NotificationModal
             isVisible={isNotificationsVisible}
             onClose={() => setIsNotificationsVisible(false)}
           />
 
-
           <View style={styles.greetingSection}>
-            <View style={styles.greetingRow}>
-              <Text style={styles.greeting}>Hello </Text>
-              {shouldAnimate ? (
-                <RotatingText
-                  ref={rotatingTextRef}
-                  texts={["There", displayName]}
-                  style={styles.greeting}
-                  rotationInterval={2000}
-                  loop={false}
-                  auto={true}
-                />
-              ) : (
-                <Text style={styles.greeting}>{displayName}</Text>
-              )}
-            </View>
+            <AnimatedGreeting displayName={displayName} shouldStartAnimation={shouldStartAnimation} />
             <Text style={styles.tagline}>Lune, An AI That Understands Your Health..</Text>
           </View>
         </View>
-
 
         {/* Feature Cards Grid */}
         <View style={styles.featuresSection}>
@@ -363,7 +438,6 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
-
 
         {/* Ask Lune AI Section */}
         <View style={styles.chatHistorySection}>
@@ -404,19 +478,47 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-
         {/* Bottom spacing */}
         <View style={{ height: 40 }} />
       </ScrollView>
-    </View>
+    </Animated.View>
   )
 }
 
-
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
-
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  spinnerContainer: {
+    marginBottom: 20,
+  },
+  spinner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 4,
+    borderColor: "#E8EAEE",
+    borderTopColor: "#2652F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  spinnerInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#F5F6FA",
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: "Inter-Medium",
+    color: "#9199B1",
+    marginTop: 16,
+  },
   notificationButton: {
     width: 40,
     height: 40,
@@ -425,11 +527,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
-    shadowColor: "#100F15",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
   },
   notificationIcon: {
     width: 24,
@@ -481,20 +578,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#E8EAEE",
-    shadowColor: "#100F15",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
   },
   premiumButton: {
     borderRadius: 20,
     overflow: "hidden",
-    shadowColor: "#2652F9",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
   },
   premiumGradient: {
     flexDirection: "row",
@@ -515,11 +602,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 4,
+    height: 40,
+    overflow: "hidden",
+  },
+  nameContainer: {
+    overflow: "hidden",
+    height: 40,
+  },
+  nameSlider: {
+    flexDirection: "column",
+  },
+  userName: {
+    color: "#2652F9",
   },
   greeting: {
     fontSize: screenWidth * 0.07,
     fontFamily: "Inter-Bold",
     color: "#100F15",
+    height: 40,
+    lineHeight: 40,
   },
   tagline: {
     fontSize: screenWidth * 0.04,
@@ -543,11 +644,6 @@ const styles = StyleSheet.create({
     padding: Math.max(16, screenWidth * 0.04),
     borderWidth: 1,
     borderColor: "#E8EAEE",
-    shadowColor: "#100F15",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
     marginBottom: Math.max(16, screenHeight * 0.02),
     marginHorizontal: 4,
   },
@@ -570,11 +666,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F6FA",
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#100F15",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   cardTitle: {
     fontSize: screenWidth * 0.04,
@@ -621,11 +712,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: "#E8EAEE",
-    shadowColor: "#100F15",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
   },
   chatPillText: {
     fontSize: screenWidth * 0.035,
@@ -636,11 +722,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderRadius: 16,
     overflow: "hidden",
-    shadowColor: "#2652F9",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
   },
   chatPremiumGradient: {
     width: "100%",

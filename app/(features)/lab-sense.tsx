@@ -9,11 +9,7 @@ export default function LabSenseScreen() {
       <RoundBackButton />
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={{ paddingTop: TOP_NAV_HEIGHT }}>
-        <FeatureScreen
-          icon="🧪"
-          title="LabSense"
-          description="Analyze and understand your lab results with AI assistance"
-        />
+
       </ScrollView>
     </SafeAreaView>
   );
