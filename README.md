@@ -1,4 +1,4 @@
-# Lune — Your AI Doctor & Health Companion
+# Lune : Your AI Doctor & Health Companion
 
 Lune is an AI-assisted medical guidance app designed to help users understand their symptoms, get health insights, and maintain wellness through intelligent, conversational assistance.  
 Lune is not a replacement for professional medical diagnosis or treatment.
@@ -29,11 +29,11 @@ Each session gives personalized, symptom-based health insights, lifestyle sugges
 |-------|-------------|
 | Framework | React Native + Expo |
 | Routing | Expo Router |
-| Backend | Supabase |
+| Backend | Postgres, Railway, NodeJS |
 | UI Components | React Native, Expo Image, Custom CSS |
 | State Management | React Hooks |
 | Styling | Internal StyleSheet (using DM Sans / Inter fonts) |
-| Deployment | Render / Expo Build |
+| Deployment | Railway / Expo Build |
 
 ---
 
