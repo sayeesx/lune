@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Only the latest major release of Lune will receive security updates.
+Only the latest stable version of Lune is actively maintained and protected against security vulnerabilities.
 
 | Version | Supported |
 |----------|------------|
@@ -11,12 +11,22 @@ Only the latest major release of Lune will receive security updates.
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability, please **do not open a public issue**.
+If you discover a security vulnerability or suspicious activity within this project:
 
-Instead, email us directly at **security@luneapp.com** (or your contact email).  
-Include the following details:
-- Description of the vulnerability  
-- Steps to reproduce  
-- Any potential impact or severity level  
+1. **Do not** open a public issue or pull request.
+2. **Immediately report** it directly via email to:  
+   **muhammedsayees.business@gmail.com**
 
-We aim to respond within **48 hours** and will coordinate a fix or disclosure plan responsibly.
+Please include:
+- A clear description of the issue
+- Steps to reproduce (if possible)
+- The potential impact or risk
+
+You will receive a response within 48 hours.
+
+All vulnerability reports will be handled confidentially until a verified resolution is deployed.
+
+## Code Ownership
+
+All code, documentation, and design assets in this repository are the sole property of **Muhammed Sayees**.  
+Unauthorized use, redistribution, or modification of this repository’s code may result in **legal action** under applicable copyright laws.
