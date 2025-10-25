@@ -15,7 +15,7 @@ If you discover a security vulnerability or suspicious activity within this proj
 
 1. **Do not** open a public issue or pull request.
 2. **Immediately report** it directly via email to:  
-   **muhammedsayees.business@gmail.com**
+   **sayeesck@yahoo.com** or contact via my portfolio : **sayees.vercel.app**
 
 Please include:
 - A clear description of the issue
