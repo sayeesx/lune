@@ -38,7 +38,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 
 const COLORS = {
@@ -54,12 +54,139 @@ const COLORS = {
 };
 
 
-// Animated Loading Dots Component
+// Animated Split Text Component (React Native version)
+interface SplitTextAnimatedProps {
+  text: string;
+  delay?: number;
+  duration?: number;
+  style?: any;
+}
+
+const SplitTextAnimated: React.FC<SplitTextAnimatedProps> = ({
+  text,
+  delay = 50,
+  duration = 600,
+  style
+}) => {
+  const [animations] = useState(() =>
+    text.split('').map(() => new Animated.Value(0))
+  );
+
+  useEffect(() => {
+    const animationSequence = animations.map((anim, index) =>
+      Animated.timing(anim, {
+        toValue: 1,
+        duration,
+        delay: index * delay,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      })
+    );
+
+    Animated.stagger(0, animationSequence).start();
+  }, [text]);
+
+  return (
+    <View style={styles.splitTextContainer}>
+      {text.split('').map((char, index) => {
+        const opacity = animations[index];
+        const translateY = animations[index].interpolate({
+          inputRange: [0, 1],
+          outputRange: [20, 0],
+        });
+
+        return (
+          <Animated.Text
+            key={`${char}-${index}`}
+            style={[
+              style,
+              {
+                opacity,
+                transform: [{ translateY }],
+              },
+            ]}
+          >
+            {char === ' ' ? '\u00A0' : char}
+          </Animated.Text>
+        );
+      })}
+    </View>
+  );
+};
+
+
+// ChatGPT-style Typing Indicator (3 bouncing dots)
+const TypingIndicator = () => {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animateDot = (dot: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, {
+            toValue: -6,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 400,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const anim1 = animateDot(dot1, 0);
+    const anim2 = animateDot(dot2, 150);
+    const anim3 = animateDot(dot3, 300);
+
+    anim1.start();
+    anim2.start();
+    anim3.start();
+
+    return () => {
+      anim1.stop();
+      anim2.stop();
+      anim3.stop();
+    };
+  }, []);
+
+  return (
+    <View style={styles.typingIndicatorContainer}>
+      <Animated.View
+        style={[
+          styles.typingDot,
+          { transform: [{ translateY: dot1 }] },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.typingDot,
+          { transform: [{ translateY: dot2 }] },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.typingDot,
+          { transform: [{ translateY: dot3 }] },
+        ]}
+      />
+    </View>
+  );
+};
+
+
+// Animated Loading Dots Component (for send button)
 const LoadingDots = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
   const dot3 = useRef(new Animated.Value(0)).current;
-  const animationRef = useRef<any>(null);
 
 
   useEffect(() => {
@@ -92,15 +219,12 @@ const LoadingDots = () => {
     anim2.start();
     anim3.start();
 
-    animationRef.current = { anim1, anim2, anim3 };
-
     return () => {
       anim1.stop();
       anim2.stop();
       anim3.stop();
     };
   }, []);
-
 
   const opacity1 = dot1.interpolate({
     inputRange: [0, 1],
@@ -139,6 +263,92 @@ interface ChatHistory {
 }
 
 
+// Save Chat Confirmation Modal
+function SaveChatModal({ visible, onClose, onSave, onDiscard, isSaving }: {
+  visible: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  onDiscard: () => void;
+  isSaving?: boolean;
+}) {
+  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      scaleAnim.setValue(0.9);
+      opacityAnim.setValue(0);
+    }
+  }, [visible]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <View style={styles.saveChatModalOverlay}>
+        <Animated.View
+          style={[
+            styles.saveChatModalContent,
+            {
+              opacity: opacityAnim,
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
+          <Text style={styles.saveChatModalTitle}>Save this conversation?</Text>
+          <Text style={styles.saveChatModalMessage}>
+            Would you like to save this chat for later? You can access it from your chat history.
+          </Text>
+
+          <View style={styles.saveChatModalButtons}>
+            <TouchableOpacity
+              style={styles.saveChatModalBtnSecondary}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onDiscard();
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.saveChatModalBtnSecondaryText}>Don't Save</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.saveChatModalBtnPrimary}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onSave();
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.saveChatModalBtnPrimaryText}>Save Chat</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+
+// Chat History Sidebar (Slides from Left)
 function ChatHistoryModal({ visible, onClose, onSelectChat }: {
   visible: boolean;
   onClose: () => void;
@@ -146,11 +356,25 @@ function ChatHistoryModal({ visible, onClose, onSelectChat }: {
 }) {
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([]);
   const [loading, setLoading] = useState(true);
+  const slideAnim = useRef(new Animated.Value(-screenWidth * 0.85)).current;
 
 
   useEffect(() => {
     if (visible) {
       loadChatHistory();
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 65,
+        friction: 10,
+      }).start();
+    } else {
+      Animated.timing(slideAnim, {
+        toValue: -screenWidth * 0.85,
+        duration: 250,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }).start();
     }
   }, [visible]);
 
@@ -185,70 +409,171 @@ function ChatHistoryModal({ visible, onClose, onSelectChat }: {
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Chat History</Text>
-            <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn}>
-              <Image
-                source={require('../../assets/navigation/close.png')}
-                style={styles.closeIcon}
-                contentFit="contain"
-              />
-            </TouchableOpacity>
-          </View>
+      <View style={styles.sidebarModalOverlay}>
+        <TouchableOpacity 
+          style={styles.sidebarOverlayTouchable} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
+        
+        <Animated.View
+          style={[
+            styles.sidebarContent,
+            {
+              transform: [{ translateX: slideAnim }],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={[COLORS.background, COLORS.white]}
+            style={styles.sidebarGradient}
+          >
+            <View style={styles.sidebarHeader}>
+              <Text style={styles.sidebarTitle}>Chat History</Text>
+              <TouchableOpacity onPress={onClose} style={styles.sidebarCloseBtn}>
+                <Image
+                  source={require('../../assets/navigation/close.png')}
+                  style={styles.closeIcon}
+                  contentFit="contain"
+                />
+              </TouchableOpacity>
+            </View>
 
 
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.blue} />
-            </View>
-          ) : chatHistory.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No chat history yet</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={chatHistory}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item, index }) => (
-                <TouchableOpacity
-                  style={styles.chatHistoryItem}
-                  onPress={() => {
-                    onSelectChat(item.id);
-                    onClose();
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.chatHistoryStack}>
-                    <LinearGradient
-                      colors={[COLORS.blue + '20', COLORS.blue + '05']}
-                      style={[styles.stackBg, { top: Math.min(index * 2, 6) }]}
-                    />
-                    <View style={styles.chatHistoryContent}>
-                      <Text style={styles.chatHistoryTitle} numberOfLines={1}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.blue} />
+              </View>
+            ) : chatHistory.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No chat history yet</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={chatHistory}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item, index }) => (
+                  <TouchableOpacity
+                    style={styles.sidebarChatItem}
+                    onPress={() => {
+                      onSelectChat(item.id);
+                      onClose();
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.sidebarChatItemContent}>
+                      <Text style={styles.sidebarChatTitle} numberOfLines={1}>
                         {item.title || `Chat ${chatHistory.length - index}`}
                       </Text>
-                      <Text style={styles.chatHistoryPreview} numberOfLines={2}>
+                      <Text style={styles.sidebarChatPreview} numberOfLines={2}>
                         {item.last_message}
                       </Text>
-                      <Text style={styles.chatHistoryDate}>
+                      <Text style={styles.sidebarChatDate}>
                         {new Date(item.updated_at).toLocaleDateString()}
                       </Text>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              )}
-              contentContainerStyle={styles.chatHistoryList}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-        </View>
+                  </TouchableOpacity>
+                )}
+                contentContainerStyle={styles.sidebarChatList}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </LinearGradient>
+        </Animated.View>
       </View>
     </Modal>
+  );
+}
+
+// Welcome Screen Component with Animated Username
+function WelcomeScreen() {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const [username, setUsername] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUsername();
+  }, []);
+
+  const fetchUsername = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        // Try to get the first part of email before @ as username
+        const emailUsername = user.email?.split('@')[0];
+        // Capitalize first letter and replace dots/underscores with spaces
+        const displayName = emailUsername ? 
+          emailUsername
+            .split(/[._]/)
+            .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+            .join(' ') : 
+          'User';
+        setUsername(displayName);
+      } else {
+        setUsername('User');
+      }
+    } catch (error) {
+      console.error('Error fetching username:', error);
+      setUsername('User');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 800,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [loading]);
+
+  if (loading) {
+    return (
+      <View style={styles.welcomeContainer}>
+        <ActivityIndicator size="large" color={COLORS.blue} />
+      </View>
+    );
+  }
+
+  return (
+    <Animated.View
+      style={[
+        styles.welcomeContainer,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+      ]}
+    >
+      <SplitTextAnimated
+        text={`Hello ${username}`}
+        delay={50}
+        duration={600}
+        style={styles.welcomeTitle}
+      />
+      <Text style={styles.welcomeDisclaimer}>
+        This is AI-assisted medical guidance provided for informational purposes only. 
+        It is not a substitute for professional medical advice. For an official diagnosis 
+        or treatment, please consult a licensed healthcare provider in person.
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -261,10 +586,14 @@ export default function AIDoctorScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [showHistory, setShowHistory] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const inputRef = useRef<TextInput>(null);
   const typingMessageIdRef = useRef<string | null>(null);
   const messageIdCounterRef = useRef(0);
+  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 
   const generateUniqueId = useCallback((role: string) => {
@@ -275,10 +604,34 @@ export default function AIDoctorScreen() {
   }, []);
 
 
+  const scrollToBottom = useCallback((animated: boolean = true) => {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated });
+    }, 100);
+  }, []);
+
+
+  const startAutoScroll = useCallback(() => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+    }
+    
+    scrollIntervalRef.current = setInterval(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 150);
+  }, []);
+
+  const stopAutoScroll = useCallback(() => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current);
+      scrollIntervalRef.current = null;
+    }
+  }, []);
+
+
   const appendMessage = useCallback((msg: Message) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setMessages((m) => {
-      // Ensure unique ID
       if (m.some(existingMsg => existingMsg.id === msg.id)) {
         msg.id = generateUniqueId(msg.role);
       }
@@ -288,13 +641,108 @@ export default function AIDoctorScreen() {
     if (msg.role === 'doctor') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, [generateUniqueId]);
 
+    scrollToBottom(true);
+  }, [generateUniqueId, scrollToBottom]);
+
+
+  const handleBackPress = useCallback(() => {
+    if (messages.length > 0) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowSaveModal(true);
+    } else {
+      router.back();
+    }
+  }, [messages.length]);
+
+
+  const saveChatToDatabase = async () => {
+    try {
+      setIsSaving(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'You must be logged in to save chats',
+          position: 'top',
+          topOffset: 60,
+        });
+        return;
+      }
+
+      const firstUserMessage = messages.find(m => m.role === 'user')?.content || 'New Chat';
+      const lastMessage = messages[messages.length - 1]?.content || '';
+
+      const { data: chatData, error: chatError } = await supabase
+        .from('chat_history')
+        .insert({
+          user_id: user.id,
+          title: firstUserMessage.substring(0, 50),
+          last_message: lastMessage.substring(0, 200),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+
+      if (chatError) {
+        console.error('Error creating chat history:', chatError);
+        throw chatError;
+      }
+
+      const messageInserts = messages.map(msg => ({
+        chat_id: chatData.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: new Date().toISOString()
+      }));
+
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .insert(messageInserts);
+
+      if (messagesError) {
+        console.error('Error saving messages:', messagesError);
+        throw messagesError;
+      }
+
+      Toast.show({
+        type: 'success',
+        text1: 'Chat Saved',
+        text2: 'Your conversation has been saved successfully',
+        position: 'top',
+        topOffset: 60,
+      });
+
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      setShowSaveModal(false);
+      router.back();
+    } catch (error: any) {
+      console.error('Error saving chat:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to save chat',
+        position: 'top',
+        topOffset: 60,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const discardChat = async () => {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+    router.back();
+  };
 
   const handleSend = async (text?: string) => {
     const content = (text ?? input).trim();
-    if (!content || loading) return;
+    if (!content || isSending || isTyping) return;
     
+    setIsSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     
     const userMsg: Message = {
@@ -306,32 +754,20 @@ export default function AIDoctorScreen() {
     appendMessage(userMsg);
     setInput('');
 
-
     const history = messages
       .filter((m) => m.role === 'user' || m.role === 'doctor')
       .map((m) => ({ role: m.role, content: m.content }));
 
-
-    const placeholderId = generateUniqueId('bot-placeholder');
-    const typingMsg: Message = { 
-      id: placeholderId, 
-      role: 'doctor', 
-      content: '…', 
-      timestamp: new Date().toISOString() 
-    };
-    appendMessage(typingMsg);
-    setIsTyping(true);
-    typingMessageIdRef.current = placeholderId;
-
+    startAutoScroll();
 
     try {
       const res = await sendMessage(content, history);
 
-      setMessages((m) => m.filter((x) => x.id !== placeholderId));
-      setIsTyping(false);
-      typingMessageIdRef.current = null;
+      setIsSending(false);
 
       if (!res || !res.success) {
+        setIsTyping(false);
+        stopAutoScroll();
         appendMessage({ 
           id: generateUniqueId('error'), 
           role: 'error', 
@@ -341,15 +777,17 @@ export default function AIDoctorScreen() {
         return;
       }
 
+      setIsTyping(true);
+
       const aiRaw = (res.data && (res.data as any).reply) || res.data || 'No response.';
       const aiText = typeof aiRaw === 'string' ? aiRaw : JSON.stringify(aiRaw);
 
       await typeOutAI(aiText);
     } catch (error) {
       console.error('Send message error:', error);
-      setMessages((m) => m.filter((x) => x.id !== placeholderId));
       setIsTyping(false);
-      typingMessageIdRef.current = null;
+      setIsSending(false);
+      stopAutoScroll();
       
       appendMessage({ 
         id: generateUniqueId('error'), 
@@ -373,20 +811,18 @@ export default function AIDoctorScreen() {
 
 
       const step = () => {
-        // Check if this typing session was cancelled
         if (typingMessageIdRef.current !== id) {
+          stopAutoScroll();
           resolve();
           return;
         }
 
 
         if (idx >= text.length) {
-          // Final update with complete text
           setMessages((m) => {
             if (typingMessageIdRef.current !== id) return m;
             
-            const without = m.filter((x) => x.id !== id);
-            return [...without, { 
+            return [...m, { 
               id, 
               role: 'doctor', 
               content: text, 
@@ -394,6 +830,10 @@ export default function AIDoctorScreen() {
             }];
           });
           typingMessageIdRef.current = null;
+          
+          setIsTyping(false);
+          stopAutoScroll();
+          scrollToBottom(true);
           resolve();
           return;
         }
@@ -418,16 +858,25 @@ export default function AIDoctorScreen() {
 
       step();
 
-      // Cleanup function
       return () => {
         if (timeoutId) clearTimeout(timeoutId);
+        stopAutoScroll();
       };
     });
   };
 
 
   useEffect(() => {
-    loadMessages();
+    const initializeFreshChat = async () => {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+      setMessages([]);
+    };
+    
+    initializeFreshChat();
+    
+    return () => {
+      stopAutoScroll();
+    };
   }, []);
 
 
@@ -440,15 +889,11 @@ export default function AIDoctorScreen() {
   }, [messages]);
 
 
-  useEffect(() => {
-    if (messages.length > 0) {
-      const timer = setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [messages.length]);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadMessages(page + 1);
+    setRefreshing(false);
+  };
 
 
   const loadMessages = async (pageNum = 1) => {
@@ -467,17 +912,11 @@ export default function AIDoctorScreen() {
     }
   };
 
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadMessages(page + 1);
-    setRefreshing(false);
-  };
-
-
   const renderItem = ({ item, index }: { item: Message; index: number }) => {
     const isUser = item.role === 'user';
     const isError = item.role === 'error';
+    // FIXED: Check if this specific message is currently being typed
+    const isCurrentlyTyping = item.id === typingMessageIdRef.current && isTyping && !item.content;
     
     return (
       <View 
@@ -488,6 +927,7 @@ export default function AIDoctorScreen() {
           text={item.content} 
           isUser={isUser} 
           isError={isError}
+          showTypingIndicator={isCurrentlyTyping} // FIXED: Pass typing indicator flag
         />
       </View>
     );
@@ -499,16 +939,26 @@ export default function AIDoctorScreen() {
       <StatusBar style="dark" />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.container}>
-          <LinearGradient
-            colors={[COLORS.blue + '15', 'transparent']}
-            style={styles.headerGradient}
-          />
+
           <View style={styles.header}>
             <View style={styles.headerContent}>
-              <View style={styles.navigationStack}>
-                <RoundBackButton />
+              <View style={styles.navigationCard}>
+                <TouchableOpacity 
+                  style={styles.backButtonContainer} 
+                  onPress={handleBackPress}
+                  activeOpacity={0.7}
+                >
+                  <Image
+                    source={require('../../assets/navigation/left.png')}
+                    style={styles.backIcon}
+                    contentFit="contain"
+                  />
+                </TouchableOpacity>
+                
+                <View style={styles.divider} />
+                
                 <TouchableOpacity
-                  style={styles.historyButton}
+                  style={styles.historyButtonInline}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setShowHistory(true);
@@ -526,12 +976,24 @@ export default function AIDoctorScreen() {
           </View>
 
 
+          <SaveChatModal
+            visible={showSaveModal}
+            onClose={() => setShowSaveModal(false)}
+            onSave={saveChatToDatabase}
+            onDiscard={() => {
+              setShowSaveModal(false);
+              router.back();
+            }}
+            isSaving={isSaving}
+          />
+
+
           <ChatHistoryModal
             visible={showHistory}
             onClose={() => setShowHistory(false)}
             onSelectChat={async (chatId) => {
-              // TODO: Load messages from selected chat
-              console.log('Loading chat:', chatId);
+              setShowHistory(false);
+              router.push(`/(features)/chat-history/${chatId}`);
             }}
           />
 
@@ -542,38 +1004,39 @@ export default function AIDoctorScreen() {
             keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
           >
             <View style={styles.chatContainer}>
-              <FlatList
-                ref={flatListRef}
-                data={messages}
-                keyExtractor={(item, index) => `${item.id}-${index}`}
-                renderItem={renderItem}
-                extraData={messages.length}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={handleRefresh}
-                    tintColor={COLORS.blue}
-                    colors={[COLORS.blue]}
-                    progressBackgroundColor={COLORS.white}
-                  />
-                }
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                keyboardDismissMode="interactive"
-                keyboardShouldPersistTaps="handled"
-                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-              />
-              
-              {/* Smooth top fade gradient */}
-              <LinearGradient
-                colors={[COLORS.background, 'transparent']}
-                style={styles.topFadeGradient}
-                pointerEvents="none"
-              />
+              {messages.length === 0 ? (
+                <WelcomeScreen />
+              ) : (
+                <FlatList
+                  ref={flatListRef}
+                  data={messages}
+                  keyExtractor={(item, index) => `${item.id}-${index}`}
+                  renderItem={renderItem}
+                  extraData={[messages.length, isTyping, typingMessageIdRef.current]}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={handleRefresh}
+                      tintColor={COLORS.blue}
+                      colors={[COLORS.blue]}
+                      progressBackgroundColor={COLORS.white}
+                    />
+                  }
+                  contentContainerStyle={styles.listContent}
+                  showsVerticalScrollIndicator={false}
+                  keyboardDismissMode="interactive"
+                  keyboardShouldPersistTaps="handled"
+                  onContentSizeChange={() => scrollToBottom(true)}
+                />
+              )}
             </View>
 
-
             <View style={styles.inputContainer}>
+              <LinearGradient
+                colors={['transparent', COLORS.background + 'E6', COLORS.background]}
+                style={styles.inputGradient}
+                pointerEvents="none"
+              />
               <View style={styles.inputWrapper}>
                 <TextInput
                   ref={inputRef}
@@ -586,23 +1049,23 @@ export default function AIDoctorScreen() {
                   maxLength={500}
                   returnKeyType="default"
                   blurOnSubmit={false}
-                  editable={!loading}
+                  editable={!isSending}
                   onFocus={() => {
                     setTimeout(() => {
-                      flatListRef.current?.scrollToEnd({ animated: true });
+                      scrollToBottom(true);
                     }, 100);
                   }}
                 />
                 <TouchableOpacity 
                   style={[
                     styles.sendBtn, 
-                    (!input.trim() || loading) && styles.sendBtnDisabled
+                    (!input.trim() || isSending || isTyping) && styles.sendBtnDisabled
                   ]} 
                   onPress={() => handleSend()} 
-                  disabled={loading || !input.trim()}
+                  disabled={isSending || !input.trim() || isTyping}
                   activeOpacity={0.7}
                 >
-                  {loading ? (
+                  {(isSending || isTyping) ? (
                     <LoadingDots />
                   ) : (
                     <Image
@@ -629,10 +1092,11 @@ interface AnimatedMessageBubbleProps {
   text: string;
   isUser?: boolean;
   isError?: boolean;
+  showTypingIndicator?: boolean; // FIXED: New prop
 }
 
 
-function AnimatedMessageBubble({ text, isUser, isError }: AnimatedMessageBubbleProps) {
+function AnimatedMessageBubble({ text, isUser, isError, showTypingIndicator }: AnimatedMessageBubbleProps) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(10)).current;
 
@@ -676,42 +1140,156 @@ function AnimatedMessageBubble({ text, isUser, isError }: AnimatedMessageBubbleP
         animatedStyle
       ]}
     >
-      <Text style={[styles.bubbleText, isUser ? styles.userText : styles.botText]}>
-        {text}
-      </Text>
+      {/* FIXED: Show typing indicator INSIDE bubble when waiting for first character */}
+      {showTypingIndicator ? (
+        <TypingIndicator />
+      ) : (
+        <Text style={[styles.bubbleText, isUser ? styles.userText : styles.botText]}>
+          {text}
+        </Text>
+      )}
     </Animated.View>
   );
 }
 
-
 const styles = StyleSheet.create({
-  modalOverlay: {
+  splitTextContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveChatModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
   },
-  modalContent: {
+  saveChatModalContent: {
+    backgroundColor: COLORS.background,
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  saveChatModalTitle: {
+    fontSize: 22,
+    fontFamily: 'Inter-Bold',
+    color: COLORS.charcoal,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  saveChatModalMessage: {
+    fontSize: 15,
+    fontFamily: 'Inter-Regular',
+    color: COLORS.gray,
+    lineHeight: 22,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  saveChatModalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  saveChatModalBtnSecondary: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '80%',
-    paddingTop: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalHeader: {
+  saveChatModalBtnSecondaryText: {
+    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
+    color: COLORS.charcoal,
+  },
+  saveChatModalBtnPrimary: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: COLORS.blue,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveChatModalBtnPrimaryText: {
+    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
+    color: COLORS.white,
+  },
+  saveChatModalBtnDisabled: {
+    opacity: 0.7,
+  },
+  loaderInChat: {
+    padding: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // ChatGPT-style typing indicator styles
+  typingIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start', // FIXED: Align left inside bubble
+    paddingVertical: 4,
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.gray,
+    marginHorizontal: 3,
+  },
+  sidebarModalOverlay: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  sidebarOverlayTouchable: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  sidebarContent: {
+    width: screenWidth * 0.85,
+    maxWidth: 320,
+    height: '100%',
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 2, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    backgroundColor: COLORS.white,
+  },
+  sidebarGradient: {
+    flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+  },
+  sidebarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
   },
-  modalTitle: {
-    fontSize: 20,
+  sidebarTitle: {
+    fontSize: 22,
     fontFamily: 'Inter-Bold',
     color: COLORS.charcoal,
   },
-  modalCloseBtn: {
+  sidebarCloseBtn: {
     width: 40,
     height: 40,
     alignItems: 'center',
@@ -739,51 +1317,38 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: COLORS.gray,
   },
-  chatHistoryList: {
-    padding: 16,
+  sidebarChatList: {
+    paddingTop: 8,
   },
-  chatHistoryItem: {
-    marginBottom: 12,
-  },
-  chatHistoryStack: {
-    position: 'relative',
-    marginHorizontal: 4,
-  },
-  stackBg: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: '100%',
-    borderRadius: 16,
-    opacity: 0.5,
-  },
-  chatHistoryContent: {
+  sidebarChatItem: {
+    marginBottom: 1,
     backgroundColor: COLORS.white,
-    borderRadius: 16,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
-  chatHistoryTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
+  sidebarChatItemContent: {
+    flex: 1,
+  },
+  sidebarChatTitle: {
+    fontSize: 15,
+    fontFamily: 'Inter-Medium',
     color: COLORS.charcoal,
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  chatHistoryPreview: {
-    fontSize: 14,
+  sidebarChatPreview: {
+    fontSize: 13,
     fontFamily: 'Inter-Regular',
     color: COLORS.gray,
-    marginBottom: 8,
-    lineHeight: 20,
+    marginBottom: 4,
+    lineHeight: 18,
+    opacity: 0.8,
   },
-  chatHistoryDate: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
-    color: COLORS.blue,
+  sidebarChatDate: {
+    fontSize: 11,
+    fontFamily: 'Inter-Regular',
+    color: COLORS.gray,
+    opacity: 0.7,
   },
   safeArea: {
     flex: 1,
@@ -792,45 +1357,71 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1,
     backgroundColor: COLORS.background,
+    position: 'relative',
+    paddingTop: 8,
   },
   headerGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 180,
+    height: 200,
     zIndex: 1,
+    opacity: 0.8,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 8 : 12,
-    paddingBottom: 8,
+    paddingTop: Platform.OS === 'ios' ? 16 : 20,
+    paddingBottom: 12,
     backgroundColor: 'transparent',
     zIndex: 10,
+    marginBottom: 4,
   },
   headerContent: {
     paddingHorizontal: 16,
   },
-  navigationStack: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  historyButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
+  navigationCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+    alignSelf: 'flex-start',
+    width: 116,
   },
-  historyIcon: {
+  backButtonContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
     width: 22,
     height: 22,
+  },
+  divider: {
+    width: 1,
+    height: 32,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 12,
+  },
+  historyButtonInline: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  historyIcon: {
+    width: 24,
+    height: 24,
   },
   keyboardView: {
     flex: 1,
@@ -839,6 +1430,28 @@ const styles = StyleSheet.create({
   chatContainer: {
     flex: 1,
     position: 'relative',
+    backgroundColor: COLORS.background,
+  },
+  welcomeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontFamily: 'Inter-Bold',
+    color: COLORS.charcoal,
+    letterSpacing: -0.5,
+  },
+  welcomeDisclaimer: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: COLORS.gray,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: 8,
+    marginTop: 20,
   },
   listContent: { 
     paddingHorizontal: 16,
@@ -851,14 +1464,15 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: 80,
     zIndex: 5,
   },
   msgRow: { 
     marginVertical: 6,
     flexDirection: 'row',
+    alignItems: 'flex-end',
   },
-  msgLeft: { 
+  msgLeft: {
     justifyContent: 'flex-start',
     maxWidth: '82%',
   },
@@ -872,14 +1486,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   botBubble: { 
     backgroundColor: COLORS.white,
     alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   userBubble: { 
     backgroundColor: COLORS.blue,
@@ -915,12 +1531,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 3,
   },
   inputContainer: {
-    backgroundColor: COLORS.background,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    backgroundColor: 'transparent',
+    position: 'relative',
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: Platform.OS === 'ios' ? 12 : 16,
+    zIndex: 1,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -964,5 +1580,13 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     tintColor: COLORS.white,
+  },
+  inputGradient: {
+    position: 'absolute',
+    top: -24,
+    left: 0,
+    right: 0,
+    height: 24,
+    zIndex: 2,
   },
 });
