@@ -2,14 +2,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Dimensions, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function PremiumScreen() {
   const insets = useSafeAreaInsets();
+  const [selectedPlan, setSelectedPlan] = useState(1);
 
   const premiumFeatures = [
     {
@@ -64,34 +66,46 @@ export default function PremiumScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       
-      {/* Header */}
-      <LinearGradient
-        colors={['#FF8C00', '#FFA500']}
-        style={[styles.header, { paddingTop: insets.top + 16 }]}
-      >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Premium Plans</Text>
-          <View style={styles.placeholder} />
-        </View>
-      </LinearGradient>
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => router.back()}
+          accessibilityLabel="Go back"
+        >
+          <MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
+          <Text style={styles.headerTitle}>Premium</Text>
+        </TouchableOpacity>
+      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {/* Premium Banner */}
         <View style={styles.bannerContainer}>
           <LinearGradient
-            colors={['#FF8C00', '#FFA500']}
+            colors={['#2652F9', '#032EA6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.banner}
           >
-            <MaterialCommunityIcons name="crown" size={48} color="#FFF" />
-            <Text style={styles.bannerTitle}>Upgrade to Premium</Text>
+            <View style={styles.crownContainer}>
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.1)']}
+                style={styles.crownCircle}
+              >
+                <Image 
+                  source={require('../../assets/home-icons/premium.png')}
+                  style={styles.premiumIcon}
+                  resizeMode="contain"
+                />
+              </LinearGradient>
+            </View>
+            <Text style={styles.bannerTitle}>Unlock Premium</Text>
             <Text style={styles.bannerSubtitle}>
-              Unlock all features and get the most out of Lune
+              Experience the full power of AI-driven healthcare
             </Text>
           </LinearGradient>
         </View>
@@ -105,22 +119,56 @@ export default function PremiumScreen() {
                 key={index}
                 style={[
                   styles.planCard,
-                  plan.popular && styles.popularPlan
+                  selectedPlan === index && styles.selectedPlan,
+                  plan.popular && styles.bestValueCard
                 ]}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
+                onPress={() => setSelectedPlan(index)}
               >
                 {plan.popular && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularText}>Most Popular</Text>
-                  </View>
+                  <LinearGradient
+                    colors={['#FFD700', '#FFC000']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.popularBadge}
+                  >
+                    <MaterialCommunityIcons name="star" size={14} color="#100F15" />
+                    <Text style={styles.popularText}>Best Value</Text>
+                  </LinearGradient>
                 )}
-                <Text style={styles.planName}>{plan.name}</Text>
+                <View style={styles.planTop}>
+                  <Text style={[
+                    styles.planName,
+                    selectedPlan === index && styles.selectedText,
+                    plan.popular && styles.bestValueText
+                  ]}>
+                    {plan.name}
+                  </Text>
+                  {selectedPlan === index && (
+                    <View style={styles.checkmark}>
+                      <MaterialCommunityIcons name="check-circle" size={24} color="#2652F9" />
+                    </View>
+                  )}
+                </View>
                 <View style={styles.priceContainer}>
-                  <Text style={styles.price}>{plan.price}</Text>
-                  <Text style={styles.period}>{plan.period}</Text>
+                  <Text style={[
+                    styles.price,
+                    selectedPlan === index && styles.selectedText,
+                    plan.popular && styles.bestValuePrice
+                  ]}>
+                    {plan.price}
+                  </Text>
+                  <Text style={[
+                    styles.period,
+                    plan.popular && styles.bestValueText
+                  ]}>
+                    {plan.period}
+                  </Text>
                 </View>
                 {plan.savings && (
-                  <Text style={styles.savings}>{plan.savings}</Text>
+                  <View style={styles.savingsBadge}>
+                    <Text style={styles.savings}>{plan.savings}</Text>
+                  </View>
                 )}
               </TouchableOpacity>
             ))}
@@ -129,13 +177,20 @@ export default function PremiumScreen() {
 
         {/* Features */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>Premium Features</Text>
+          <Text style={styles.sectionTitle}>What's Included</Text>
           <View style={styles.featuresList}>
             {premiumFeatures.map((feature, index) => (
               <View key={index} style={styles.featureItem}>
-                <View style={styles.featureIcon}>
-                  <MaterialCommunityIcons name={feature.icon as any} size={24} color="#FF8C00" />
-                </View>
+                <LinearGradient
+                  colors={['rgba(38, 82, 249, 0.12)', 'rgba(3, 46, 166, 0.08)']}
+                  style={styles.featureIcon}
+                >
+                  <MaterialCommunityIcons 
+                    name={feature.icon as any} 
+                    size={24} 
+                    color="#2652F9" 
+                  />
+                </LinearGradient>
                 <View style={styles.featureContent}>
                   <Text style={styles.featureTitle}>{feature.title}</Text>
                   <Text style={styles.featureDescription}>{feature.description}</Text>
@@ -146,20 +201,29 @@ export default function PremiumScreen() {
         </View>
 
         {/* CTA Button */}
-        <TouchableOpacity style={styles.ctaButton} activeOpacity={0.8}>
+        <TouchableOpacity 
+          style={styles.ctaButton} 
+          activeOpacity={0.8}
+        >
           <LinearGradient
-            colors={['#FF8C00', '#FFA500']}
+            colors={['#2652F9', '#032EA6']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
             style={styles.ctaGradient}
           >
-            <MaterialCommunityIcons name="crown" size={20} color="#FFF" />
-            <Text style={styles.ctaText}>Start Premium Trial</Text>
+            <Image 
+              source={require('../../assets/home-icons/premium.png')}
+              style={styles.ctaIcon}
+              resizeMode="contain"
+            />
+            <Text style={styles.ctaText}>Start 7-Day Free Trial</Text>
           </LinearGradient>
         </TouchableOpacity>
 
         {/* Terms */}
         <Text style={styles.termsText}>
-          By subscribing, you agree to our Terms of Service and Privacy Policy.
-          Cancel anytime.
+          By subscribing, you agree to our Terms of Service and Privacy Policy.{'\n'}
+          Cancel anytime from your account settings.
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -169,159 +233,197 @@ export default function PremiumScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#100F15',
   },
   header: {
-    paddingHorizontal: screenWidth * 0.06,
-    paddingBottom: 16,
-  },
-  headerContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    backgroundColor: 'transparent',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: screenWidth * 0.05,
-    fontFamily: 'Inter-Bold',
-    color: '#FFF',
-  },
-  placeholder: {
-    width: 40,
+    fontSize: 20,
+    fontFamily: 'Inter-SemiBold',
+    color: '#FFFFFF',
+    marginLeft: 8,
   },
   content: {
     flex: 1,
-    paddingHorizontal: screenWidth * 0.06,
+    backgroundColor: '#100F15',
+  },
+  scrollContent: {
+    paddingHorizontal: screenWidth * 0.05,
+    paddingTop: 24,
+    paddingBottom: 40,
   },
   bannerContainer: {
-    marginTop: 20,
-    marginBottom: 30,
+    marginBottom: 32,
   },
   banner: {
-    borderRadius: 20,
-    padding: 30,
+    borderRadius: 24,
+    padding: 40,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
+    overflow: 'hidden',
+  },
+  crownContainer: {
+    marginBottom: 20,
+  },
+  crownCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  premiumIcon: {
+    width: 56,
+    height: 56,
+    tintColor: '#FFFFFF',
   },
   bannerTitle: {
-    fontSize: screenWidth * 0.06,
+    fontSize: 28,
     fontFamily: 'Inter-Bold',
-    color: '#FFF',
-    marginTop: 16,
-    marginBottom: 8,
+    color: '#FFFFFF',
+    marginBottom: 12,
+    letterSpacing: 0.5,
   },
   bannerSubtitle: {
-    fontSize: screenWidth * 0.04,
+    fontSize: 15,
     fontFamily: 'Inter-Regular',
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: 'rgba(255, 255, 255, 0.85)',
     textAlign: 'center',
     lineHeight: 22,
+    maxWidth: '90%',
   },
   plansSection: {
-    marginBottom: 30,
+    marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: screenWidth * 0.05,
+    fontSize: 22,
     fontFamily: 'Inter-Bold',
-    color: '#1A1A1A',
-    marginBottom: 16,
+    color: '#FFFFFF',
+    marginBottom: 20,
+    letterSpacing: 0.3,
   },
   plansContainer: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 14,
   },
   planCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: '#1A1A24',
+    borderRadius: 20,
     padding: 20,
-    alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E5E5E5',
+    borderColor: '#2A2A38',
     position: 'relative',
   },
-  popularPlan: {
-    borderColor: '#FF8C00',
-    shadowColor: '#FF8C00',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+  selectedPlan: {
+    backgroundColor: 'rgba(38, 82, 249, 0.08)',
+    borderColor: '#2652F9',
+    transform: [{ scale: 1.02 }],
+  },
+  bestValueCard: {
+    borderColor: '#FFD700',
+    borderWidth: 3,
   },
   popularBadge: {
     position: 'absolute',
-    top: -8,
-    backgroundColor: '#FF8C00',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    top: -12,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   popularText: {
-    color: '#FFF',
+    color: '#100F15',
     fontSize: 12,
     fontFamily: 'Inter-SemiBold',
+    letterSpacing: 0.3,
+  },
+  planTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   planName: {
-    fontSize: screenWidth * 0.045,
+    fontSize: 18,
     fontFamily: 'Inter-SemiBold',
-    color: '#1A1A1A',
-    marginBottom: 8,
+    color: '#9199B1',
+  },
+  selectedText: {
+    color: '#FFFFFF',
+  },
+  bestValueText: {
+    color: '#FFFFFF',
+  },
+  bestValuePrice: {
+    color: '#FFFFFF',
+  },
+  checkmark: {
+    marginLeft: 8,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   price: {
-    fontSize: screenWidth * 0.06,
+    fontSize: 32,
     fontFamily: 'Inter-Bold',
-    color: '#1A1A1A',
+    color: '#9199B1',
+    letterSpacing: -0.5,
   },
   period: {
-    fontSize: screenWidth * 0.035,
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#666',
-    marginLeft: 2,
+    color: '#9199B1',
+    marginLeft: 4,
+  },
+  savingsBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   savings: {
-    fontSize: screenWidth * 0.03,
+    fontSize: 13,
     fontFamily: 'Inter-SemiBold',
     color: '#10B981',
   },
   featuresSection: {
-    marginBottom: 30,
+    marginBottom: 32,
   },
   featuresList: {
-    gap: 16,
+    gap: 12,
   },
   featureItem: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#1A1A24',
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#2A2A38',
   },
   featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF5F0',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -330,40 +432,51 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   featureTitle: {
-    fontSize: screenWidth * 0.04,
+    fontSize: 16,
     fontFamily: 'Inter-SemiBold',
-    color: '#1A1A1A',
+    color: '#FFFFFF',
     marginBottom: 4,
+    letterSpacing: 0.2,
   },
   featureDescription: {
-    fontSize: screenWidth * 0.035,
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#666',
+    color: '#9199B1',
     lineHeight: 20,
   },
   ctaButton: {
-    marginBottom: 20,
-    borderRadius: 24,
+    marginBottom: 24,
+    borderRadius: 16,
     overflow: 'hidden',
+    shadowColor: '#2652F9',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
   },
   ctaGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
+    paddingVertical: 18,
+    gap: 10,
+  },
+  ctaIcon: {
+    width: 22,
+    height: 22,
+    tintColor: '#FFFFFF',
   },
   ctaText: {
-    color: '#FFF',
-    fontSize: screenWidth * 0.045,
+    color: '#FFFFFF',
+    fontSize: 17,
     fontFamily: 'Inter-Bold',
+    letterSpacing: 0.3,
   },
   termsText: {
-    fontSize: screenWidth * 0.03,
+    fontSize: 13,
     fontFamily: 'Inter-Regular',
-    color: '#666',
+    color: '#9199B1',
     textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 20,
+    lineHeight: 20,
   },
 });
