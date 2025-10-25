@@ -7,6 +7,7 @@ export default function FeaturesLayout() {
   return (
     <Stack
       screenOptions={{
+        headerShown: false,
         headerStyle: {
           backgroundColor: colors.background,
         },

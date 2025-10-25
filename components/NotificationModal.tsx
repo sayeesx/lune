@@ -5,6 +5,7 @@ import {
     ActivityIndicator,
     Animated,
     FlatList,
+    Image,
     Modal,
     StyleSheet,
     Text,
@@ -14,7 +15,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
-
 interface Notification {
   id: string;
   title: string;
@@ -22,14 +22,13 @@ interface Notification {
   type: 'info' | 'success' | 'warning' | 'error';
   read: boolean;
   created_at: string;
+  nav_path?: string;
 }
-
 
 interface NotificationModalProps {
   isVisible: boolean;
   onClose: () => void;
 }
-
 
 export default function NotificationModal({ isVisible, onClose }: NotificationModalProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -38,12 +37,10 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-
   useEffect(() => {
     if (isVisible) {
       setLoading(true);
       fetchNotifications();
-      // Smooth slide up animation
       Animated.spring(slideAnim, {
         toValue: 1,
         useNativeDriver: true,
@@ -51,7 +48,6 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
         friction: 11,
       }).start();
     } else {
-      // Slide down animation
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 250,
@@ -60,24 +56,21 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
     }
   }, [isVisible]);
 
-
   const fetchNotifications = async () => {
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      
+
       if (sessionError || !sessionData.session) {
         setNotifications([]);
         setLoading(false);
         return;
       }
 
-
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
         .eq('user_id', sessionData.session.user.id)
         .order('created_at', { ascending: false });
-
 
       if (error) throw error;
       setNotifications(data || []);
@@ -93,7 +86,6 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
     }
   };
 
-
   const markAsRead = async (id: string) => {
     try {
       const { error } = await supabase
@@ -101,9 +93,8 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
         .update({ read: true })
         .eq('id', id);
 
-
       if (error) throw error;
-      
+
       setNotifications(prevNotifications =>
         prevNotifications.map(notification =>
           notification.id === id ? { ...notification, read: true } : notification
@@ -119,44 +110,52 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
     }
   };
 
+const renderNotification = ({ item }: { item: Notification }) => {
+  const backgroundColor = item.read ? '#F5F6FA' : '#FFFFFF';
+  const typeColors = {
+    info: '#2652F9',
+    success: '#4CAF50',
+    warning: '#FFA000',
+    error: '#F44336',
+  };
 
-  const renderNotification = ({ item }: { item: Notification }) => {
-    const backgroundColor = item.read ? '#F5F6FA' : '#FFFFFF';
-    const typeColors = {
-      info: '#2652F9',
-      success: '#4CAF50',
-      warning: '#FFA000',
-      error: '#F44336',
-    };
+  return (
+    <View style={[styles.notificationItem, { backgroundColor }]}>
+      <View style={[styles.typeIndicator, { backgroundColor: typeColors[item.type] }]} />
+      <View style={styles.notificationContent}>
+        <Text style={styles.title}>{item.title}</Text>
 
+        {/* ✅ Fixed: show body or message */}
+        <Text style={styles.message}>{item.body || item.message}</Text>
 
-    return (
+        <Text style={styles.timestamp}>
+          {new Date(item.created_at).toLocaleDateString()}
+        </Text>
+      </View>
+
       <TouchableOpacity
-        style={[styles.notificationItem, { backgroundColor }]}
         onPress={() => {
           if (!item.read) markAsRead(item.id);
-          // Handle notification press
+          if (item.nav_path) router.push(item.nav_path);
         }}
-        activeOpacity={0.7}
+        style={styles.arrowButton}
+        activeOpacity={0.8}
       >
-        <View style={[styles.typeIndicator, { backgroundColor: typeColors[item.type] }]} />
-        <View style={styles.notificationContent}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.message}>{item.message}</Text>
-          <Text style={styles.timestamp}>
-            {new Date(item.created_at).toLocaleDateString()}
-          </Text>
-        </View>
+        <Image
+          source={require('@/assets/navigation/left.png')}
+          style={styles.arrowIcon}
+          resizeMode="contain"
+        />
       </TouchableOpacity>
-    );
-  };
+    </View>
+  );
+};
 
 
   const translateY = slideAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [600, 0],
   });
-
 
   return (
     <Modal
@@ -167,18 +166,18 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
       statusBarTranslucent
     >
       <View style={styles.modalOverlay}>
-        <TouchableOpacity 
-          style={StyleSheet.absoluteFill} 
-          activeOpacity={1} 
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
           onPress={onClose}
         />
-        <Animated.View 
+        <Animated.View
           style={[
             styles.modalContent,
             {
               paddingBottom: insets.bottom || 16,
               transform: [{ translateY }],
-            }
+            },
           ]}
         >
           <View style={styles.modalHeader}>
@@ -187,7 +186,6 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
           </View>
-
 
           {loading ? (
             <View style={styles.loadingContainer}>
@@ -212,7 +210,6 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
   );
 }
 
-
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -224,7 +221,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '85%',
-    shadowColor: "#000",
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
@@ -262,12 +259,13 @@ const styles = StyleSheet.create({
   },
   notificationItem: {
     flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#E8EAEE',
-    shadowColor: "#100F15",
+    shadowColor: '#100F15',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
@@ -277,6 +275,7 @@ const styles = StyleSheet.create({
     width: 4,
     borderRadius: 2,
     marginRight: 12,
+    alignSelf: 'stretch',
   },
   notificationContent: {
     flex: 1,
@@ -298,6 +297,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     color: '#9199B1',
+  },
+  arrowButton: {
+    alignSelf: 'center',
+    padding: 6,
+  },
+  arrowIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#2652F9',
+    transform: [{ rotate: '180deg' }], // rotates left arrow to point right
   },
   loadingContainer: {
     padding: 48,

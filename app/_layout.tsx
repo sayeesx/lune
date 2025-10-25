@@ -1,3 +1,4 @@
+import TopNavBar from '@/components/TopNavBar';
 import { fonts } from '@/theme/fonts';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import * as Font from 'expo-font';
@@ -153,6 +154,8 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      {/* Show a consistent top nav on non-auth pages */}
+      {segments[0] !== 'auth' && !isBootstrapping && !isLoading && <TopNavBar />}
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(features)" options={{ headerShown: false }} />

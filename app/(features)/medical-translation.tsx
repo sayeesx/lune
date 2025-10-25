@@ -1,14 +1,13 @@
+import RoundBackButton from '../../components/navigation/RoundBackButton';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function MedicalTranslationScreen() {
-  const insets = useSafeAreaInsets();
   const [inputText, setInputText] = useState('');
   const [translatedText, setTranslatedText] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
@@ -60,23 +59,18 @@ export default function MedicalTranslationScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <RoundBackButton />
       <StatusBar style="dark" />
-      
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#1A1A1A" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Medical Translation</Text>
-          <View style={styles.placeholder} />
+      <ScrollView style={styles.content}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <RoundBackButton />
+            <Text style={styles.headerTitle}>Medical Translation</Text>
+            <View style={styles.placeholder} />
+          </View>
         </View>
-      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Translation Input */}
         <View style={styles.inputSection}>
           <Text style={styles.sectionTitle}>Translate Medical Terms</Text>
