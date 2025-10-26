@@ -8,17 +8,20 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+
 
 const COLORS = {
   white: '#FFFFFF',
@@ -30,12 +33,17 @@ const COLORS = {
   background: '#F8F9FC',
 };
 
+
 export default function ProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showMedicalDataModal, setShowMedicalDataModal] = useState(false);
   
   // Edit mode for cards
   const [editingPersonal, setEditingPersonal] = useState(false);
@@ -53,15 +61,91 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState('');
   const [bmi, setBmi] = useState<number | null>(null);
 
+  // Privacy & Notifications Settings
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [shareHealthData, setShareHealthData] = useState(true);
+  const [personalizedRecommendations, setPersonalizedRecommendations] = useState(true);
+  const [dataAnalytics, setDataAnalytics] = useState(false);
+  const [medicalDataAccess, setMedicalDataAccess] = useState(true);
+  const [thirdPartyAccess, setThirdPartyAccess] = useState(false);
+  const [researchDataSharing, setResearchDataSharing] = useState(false);
+
+  // Modal animations
+  const [modalOpacity] = useState(new Animated.Value(0));
+  const [modalScale] = useState(new Animated.Value(0.9));
+  const [slideModalTranslateY] = useState(new Animated.Value(300));
+
   useEffect(() => {
     loadProfile();
   }, []);
 
+  useEffect(() => {
+    if (showSignOutModal || showNotificationsModal) {
+      Animated.parallel([
+        Animated.timing(modalOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(modalScale, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(modalOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(modalScale, {
+          toValue: 0.9,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showSignOutModal, showNotificationsModal]);
+
+  useEffect(() => {
+    if (showPrivacyModal || showTermsModal || showMedicalDataModal) {
+      Animated.parallel([
+        Animated.timing(modalOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideModalTranslateY, {
+          toValue: 0,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(modalOpacity, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideModalTranslateY, {
+          toValue: 300,
+          duration: 250,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showPrivacyModal, showTermsModal, showMedicalDataModal]);
+
   const getBMICategory = (bmiValue: number) => {
-    if (bmiValue < 18.5) return { category: 'Underweight', color: '#FFC107' }; // Yellow
-    if (bmiValue >= 18.5 && bmiValue < 25) return { category: 'Normal', color: COLORS.blue }; // Blue
-    if (bmiValue >= 25 && bmiValue < 30) return { category: 'Overweight', color: '#FFC107' }; // Yellow
-    return { category: 'Obese', color: '#F44336' }; // Red
+    if (bmiValue < 18.5) return { category: 'Underweight', color: '#FFC107' };
+    if (bmiValue >= 18.5 && bmiValue < 25) return { category: 'Normal', color: COLORS.blue };
+    if (bmiValue >= 25 && bmiValue < 30) return { category: 'Overweight', color: '#FFC107' };
+    return { category: 'Obese', color: '#F44336' };
   };
 
   const validateAndCalculateBMI = (weightStr: string, heightStr: string): { valid: boolean; bmi: number | null; error?: string } => {
@@ -126,6 +210,17 @@ export default function ProfileScreen() {
           setWeight(goals.weight?.toString() ?? '');
           setHeight(goals.height?.toString() ?? '');
           setBmi(goals.bmi ?? null);
+        }
+
+        if (data.privacy_settings) {
+          const privacy = data.privacy_settings as any;
+          setNotificationsEnabled(privacy.notifications_enabled ?? true);
+          setShareHealthData(privacy.share_health_data ?? true);
+          setPersonalizedRecommendations(privacy.personalized_recommendations ?? true);
+          setDataAnalytics(privacy.data_analytics ?? false);
+          setMedicalDataAccess(privacy.medical_data_access ?? true);
+          setThirdPartyAccess(privacy.third_party_access ?? false);
+          setResearchDataSharing(privacy.research_data_sharing ?? false);
         }
       }
     } catch (error: any) {
@@ -232,7 +327,6 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Validate and calculate BMI
       const bmiResult = validateAndCalculateBMI(weight, height);
       
       if (!bmiResult.valid) {
@@ -248,7 +342,6 @@ export default function ProfileScreen() {
         return;
       }
 
-      // Prepare health goals with BMI
       const healthGoals = {
         weight: weight ? parseFloat(weight) : null,
         height: height ? parseFloat(height) : null,
@@ -263,7 +356,6 @@ export default function ProfileScreen() {
       
       if (error) throw error;
       
-      // Update local BMI state only after successful save
       setBmi(bmiResult.bmi);
       
       setEditingPersonal(false);
@@ -334,6 +426,124 @@ export default function ProfileScreen() {
     });
   };
 
+  const handleTurnOffNotifications = async () => {
+    try {
+      const privacySettings = {
+        notifications_enabled: false,
+        share_health_data: shareHealthData,
+        personalized_recommendations: personalizedRecommendations,
+        data_analytics: dataAnalytics,
+        medical_data_access: medicalDataAccess,
+        third_party_access: thirdPartyAccess,
+        research_data_sharing: researchDataSharing,
+      };
+
+      const { error } = await updateMyProfile({
+        privacy_settings: privacySettings,
+      });
+
+      if (error) throw error;
+
+      setNotificationsEnabled(false);
+      setShowNotificationsModal(false);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Notifications Disabled',
+        text2: 'You will no longer receive notifications from the app',
+        position: 'top',
+        topOffset: 60,
+        visibilityTime: 3000,
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: 'Failed to update notification settings. Please try again.',
+        position: 'top',
+        topOffset: 60,
+      });
+    }
+  };
+
+  const handleSavePrivacySettings = async () => {
+    try {
+      const privacySettings = {
+        notifications_enabled: notificationsEnabled,
+        share_health_data: shareHealthData,
+        personalized_recommendations: personalizedRecommendations,
+        data_analytics: dataAnalytics,
+        medical_data_access: medicalDataAccess,
+        third_party_access: thirdPartyAccess,
+        research_data_sharing: researchDataSharing,
+      };
+
+      const { error } = await updateMyProfile({
+        privacy_settings: privacySettings,
+      });
+
+      if (error) throw error;
+
+      setShowPrivacyModal(false);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Privacy Settings Updated',
+        text2: 'Your privacy preferences have been saved successfully',
+        position: 'top',
+        topOffset: 60,
+        visibilityTime: 3000,
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: 'Failed to save privacy settings. Please try again.',
+        position: 'top',
+        topOffset: 60,
+      });
+    }
+  };
+
+  const handleSaveMedicalDataAccess = async () => {
+    try {
+      const privacySettings = {
+        notifications_enabled: notificationsEnabled,
+        share_health_data: shareHealthData,
+        personalized_recommendations: personalizedRecommendations,
+        data_analytics: dataAnalytics,
+        medical_data_access: medicalDataAccess,
+        third_party_access: thirdPartyAccess,
+        research_data_sharing: researchDataSharing,
+      };
+
+      const { error } = await updateMyProfile({
+        privacy_settings: privacySettings,
+      });
+
+      if (error) throw error;
+
+      setShowMedicalDataModal(false);
+
+      Toast.show({
+        type: 'success',
+        text1: 'Medical Data Access Updated',
+        text2: 'Your medical data access preferences have been saved',
+        position: 'top',
+        topOffset: 60,
+        visibilityTime: 3000,
+      });
+    } catch (error: any) {
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: 'Failed to update medical data access. Please try again.',
+        position: 'top',
+        topOffset: 60,
+      });
+    }
+  };
+
   const handleSignOutConfirm = async () => {
     setShowSignOutModal(false);
     await AsyncStorage.clear();
@@ -348,6 +558,12 @@ export default function ProfileScreen() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const getGenderIcon = () => {
+    if (gender === 'Male') return 'male';
+    if (gender === 'Female') return 'female';
+    return 'male-female';
   };
 
   if (loading) {
@@ -493,31 +709,50 @@ export default function ProfileScreen() {
             editable={editingPersonal}
           />
 
-          {/* Gender Selector */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Gender</Text>
-            <View style={styles.genderSelector}>
-              {(['Male', 'Female', 'Other'] as const).map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.genderOption,
-                    gender === option && styles.genderOptionActive,
-                    !editingPersonal && styles.genderOptionDisabled,
-                  ]}
-                  onPress={() => editingPersonal && setGender(option)}
-                  disabled={!editingPersonal}
-                >
-                  <Text style={[
-                    styles.genderOptionText,
-                    gender === option && styles.genderOptionTextActive,
-                  ]}>
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Gender Display - Show only selected with icon */}
+          {!editingPersonal ? (
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Gender</Text>
+              <View style={styles.genderDisplayContainer}>
+                <View style={styles.genderIconCircle}>
+                  <Ionicons name={getGenderIcon()} size={20} color={COLORS.blue} />
+                </View>
+                <Text style={styles.genderDisplayText}>{gender}</Text>
+              </View>
             </View>
-          </View>
+          ) : (
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Gender</Text>
+              <View style={styles.genderSelector}>
+                {(['Male', 'Female', 'Other'] as const).map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.genderOption,
+                      gender === option && styles.genderOptionActive,
+                    ]}
+                    onPress={() => setGender(option)}
+                  >
+                    <Ionicons 
+                      name={
+                        option === 'Male' ? 'male' : 
+                        option === 'Female' ? 'female' : 
+                        'male-female'
+                      } 
+                      size={18} 
+                      color={gender === option ? COLORS.blue : COLORS.gray} 
+                    />
+                    <Text style={[
+                      styles.genderOptionText,
+                      gender === option && styles.genderOptionTextActive,
+                    ]}>
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
           <View style={styles.fieldRow}>
             <View style={{ flex: 1 }}>
@@ -626,22 +861,22 @@ export default function ProfileScreen() {
           <SettingsItem
             icon="notifications"
             label="Notifications"
-            onPress={() => {}}
+            onPress={() => setShowNotificationsModal(true)}
           />
           <SettingsItem
             icon="lock-closed"
             label="Privacy & Permissions"
-            onPress={() => {}}
+            onPress={() => setShowPrivacyModal(true)}
           />
           <SettingsItem
             icon="medkit"
             label="Medical Data Access"
-            onPress={() => {}}
+            onPress={() => setShowMedicalDataModal(true)}
           />
           <SettingsItem
             icon="document-text"
             label="Terms & Conditions"
-            onPress={() => {}}
+            onPress={() => setShowTermsModal(true)}
           />
         </View>
 
@@ -668,31 +903,49 @@ export default function ProfileScreen() {
       <Modal
         visible={showSignOutModal}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setShowSignOutModal(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalIconContainer}>
-              <Ionicons name="log-out-outline" size={48} color={COLORS.blue} />
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            activeOpacity={1} 
+            onPress={() => setShowSignOutModal(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modernModalContainer,
+              {
+                opacity: modalOpacity,
+                transform: [{ scale: modalScale }],
+              },
+            ]}
+          >
+            <View style={styles.modernModalIconContainer}>
+              <LinearGradient
+                colors={['#FF3B30', '#C62828']}
+                style={styles.modernModalIconGradient}
+              >
+                <Ionicons name="log-out-outline" size={32} color={COLORS.white} />
+              </LinearGradient>
             </View>
             
-            <Text style={styles.modalTitle}>Sign Out</Text>
-            <Text style={styles.modalMessage}>
+            <Text style={styles.modernModalTitle}>Sign Out</Text>
+            <Text style={styles.modernModalMessage}>
               Are you sure you want to sign out of your account?
             </Text>
 
-            <View style={styles.modalButtons}>
+            <View style={styles.modernModalButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonCancel]}
+                style={[styles.modernModalButton, styles.modernModalButtonSecondary]}
                 onPress={() => setShowSignOutModal(false)}
                 activeOpacity={0.8}
               >
-                <Text style={styles.modalButtonTextCancel}>No</Text>
+                <Text style={styles.modernModalButtonTextSecondary}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonConfirm]}
+                style={[styles.modernModalButton, styles.modernModalButtonPrimary]}
                 onPress={handleSignOutConfirm}
                 activeOpacity={0.8}
               >
@@ -700,21 +953,389 @@ export default function ProfileScreen() {
                   colors={['#FF3B30', '#C62828']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={styles.modalButtonGradient}
+                  style={styles.modernModalButtonGradient}
                 >
-                  <Text style={styles.modalButtonTextConfirm}>Yes, Sign Out</Text>
+                  <Text style={styles.modernModalButtonTextPrimary}>Sign Out</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
 
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowSignOutModal(false)}
-            >
-              <Ionicons name="close" size={24} color={COLORS.gray} />
-            </TouchableOpacity>
-          </View>
-        </View>
+      {/* Notifications Modal */}
+      <Modal
+        visible={showNotificationsModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowNotificationsModal(false)}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            activeOpacity={1} 
+            onPress={() => setShowNotificationsModal(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modernModalContainer,
+              {
+                opacity: modalOpacity,
+                transform: [{ scale: modalScale }],
+              },
+            ]}
+          >
+            <View style={styles.modernModalIconContainer}>
+              <LinearGradient
+                colors={[COLORS.blue, COLORS.deepBlue]}
+                style={styles.modernModalIconGradient}
+              >
+                <Ionicons name="notifications-off" size={32} color={COLORS.white} />
+              </LinearGradient>
+            </View>
+            
+            <Text style={styles.modernModalTitle}>Turn Off Notifications?</Text>
+            <Text style={styles.modernModalMessage}>
+              You won't receive health reminders, appointment alerts, or important updates
+            </Text>
+
+            <View style={styles.modernModalButtons}>
+              <TouchableOpacity
+                style={[styles.modernModalButton, styles.modernModalButtonSecondary]}
+                onPress={() => setShowNotificationsModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modernModalButtonTextSecondary}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modernModalButton, styles.modernModalButtonPrimary]}
+                onPress={handleTurnOffNotifications}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[COLORS.blue, COLORS.deepBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modernModalButtonGradient}
+                >
+                  <Text style={styles.modernModalButtonTextPrimary}>Turn Off</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Privacy & Permissions Modal */}
+      <Modal
+        visible={showPrivacyModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowPrivacyModal(false)}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            activeOpacity={1} 
+            onPress={() => setShowPrivacyModal(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modernSlideModal,
+              {
+                opacity: modalOpacity,
+                transform: [{ translateY: slideModalTranslateY }],
+              },
+            ]}
+          >
+            <View style={styles.modalHandle} />
+            
+            <View style={styles.modernModalHeader}>
+              <View style={styles.modernModalHeaderIcon}>
+                <Ionicons name="lock-closed" size={24} color={COLORS.blue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modernSlideModalTitle}>Privacy & Permissions</Text>
+                <Text style={styles.modernSlideModalSubtitle}>Manage your data preferences</Text>
+              </View>
+            </View>
+
+            <ScrollView style={styles.modernToggleContainer} showsVerticalScrollIndicator={false}>
+              <ModernToggleItem
+                icon="fitness"
+                label="Share Health Data with AI"
+                description="Allow AI to analyze your health data for personalized insights"
+                value={shareHealthData}
+                onValueChange={setShareHealthData}
+              />
+              <ModernToggleItem
+                icon="bulb"
+                label="Personalized Recommendations"
+                description="Receive tailored health suggestions based on your profile"
+                value={personalizedRecommendations}
+                onValueChange={setPersonalizedRecommendations}
+              />
+              <ModernToggleItem
+                icon="bar-chart"
+                label="Data Analytics"
+                description="Help improve features through anonymous usage data"
+                value={dataAnalytics}
+                onValueChange={setDataAnalytics}
+              />
+            </ScrollView>
+
+            <View style={styles.modernModalFooter}>
+              <TouchableOpacity
+                style={styles.modernFullWidthButton}
+                onPress={handleSavePrivacySettings}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={[COLORS.blue, COLORS.deepBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modernFullWidthButtonGradient}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
+                  <Text style={styles.modernFullWidthButtonText}>Save Preferences</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Medical Data Access Modal */}
+      <Modal
+        visible={showMedicalDataModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowMedicalDataModal(false)}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            activeOpacity={1} 
+            onPress={() => setShowMedicalDataModal(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modernSlideModal,
+              {
+                opacity: modalOpacity,
+                transform: [{ translateY: slideModalTranslateY }],
+              },
+            ]}
+          >
+            <View style={styles.modalHandle} />
+            
+            <View style={styles.modernModalHeader}>
+              <View style={styles.modernModalHeaderIcon}>
+                <Ionicons name="medkit" size={24} color={COLORS.blue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modernSlideModalTitle}>Medical Data Access</Text>
+                <Text style={styles.modernSlideModalSubtitle}>Control who can access your medical records</Text>
+              </View>
+            </View>
+
+            <ScrollView style={styles.modernToggleContainer} showsVerticalScrollIndicator={false}>
+              <ModernToggleItem
+                icon="pulse"
+                label="AI Health Assistant"
+                description="Enable AI to access medical records for diagnosis support"
+                value={medicalDataAccess}
+                onValueChange={setMedicalDataAccess}
+              />
+              <ModernToggleItem
+                icon="people"
+                label="Healthcare Providers"
+                description="Share data with verified medical professionals"
+                value={thirdPartyAccess}
+                onValueChange={setThirdPartyAccess}
+              />
+              <ModernToggleItem
+                icon="flask"
+                label="Research Data Sharing"
+                description="Contribute anonymously to medical research studies"
+                value={researchDataSharing}
+                onValueChange={setResearchDataSharing}
+              />
+            </ScrollView>
+
+            <View style={styles.modernModalFooter}>
+              <TouchableOpacity
+                style={styles.modernFullWidthButton}
+                onPress={handleSaveMedicalDataAccess}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={[COLORS.blue, COLORS.deepBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modernFullWidthButtonGradient}
+                >
+                  <Ionicons name="shield-checkmark" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
+                  <Text style={styles.modernFullWidthButtonText}>Update Access</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Terms & Conditions Modal */}
+      <Modal
+        visible={showTermsModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => setShowTermsModal(false)}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            activeOpacity={1} 
+            onPress={() => setShowTermsModal(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.modernSlideModal,
+              {
+                opacity: modalOpacity,
+                transform: [{ translateY: slideModalTranslateY }],
+              },
+            ]}
+          >
+            <View style={styles.modalHandle} />
+            
+            <View style={styles.modernModalHeader}>
+              <View style={styles.modernModalHeaderIcon}>
+                <Ionicons name="document-text" size={24} color={COLORS.blue} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modernSlideModalTitle}>Terms & Conditions</Text>
+                <Text style={styles.modernSlideModalSubtitle}>Last updated: October 2025</Text>
+              </View>
+            </View>
+
+            <ScrollView style={styles.termsScrollContainer} showsVerticalScrollIndicator={true}>
+              <View style={styles.termsSection}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>1</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>Acceptance of Terms</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  By accessing and using Lune AI Health App, you accept and agree to be bound by the terms and provision of this agreement.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>2</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>Use of Service</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  Lune provides AI-powered health insights and is not a substitute for professional medical advice. Always consult with qualified healthcare providers for medical decisions.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>3</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>Privacy and Data Protection</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  We take your privacy seriously. Your health data is encrypted and stored securely. We will never sell your personal information to third parties.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>4</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>User Responsibilities</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  You are responsible for maintaining the confidentiality of your account and password. You agree to accept responsibility for all activities that occur under your account.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>5</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>Medical Disclaimer</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  The information provided by Lune is for informational purposes only. It should not be considered as medical advice, diagnosis, or treatment.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>6</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>Limitation of Liability</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  Lune shall not be liable for any indirect, incidental, special, consequential or punitive damages resulting from your use or inability to use the service.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>7</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>Changes to Terms</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  We reserve the right to modify these terms at any time. Continued use of the service after changes constitutes acceptance of the new terms.
+                </Text>
+              </View>
+
+              <View style={[styles.termsSection, { marginBottom: 0 }]}>
+                <View style={styles.termsSectionHeader}>
+                  <View style={styles.termsSectionNumber}>
+                    <Text style={styles.termsSectionNumberText}>8</Text>
+                  </View>
+                  <Text style={styles.termsHeading}>Contact Information</Text>
+                </View>
+                <Text style={styles.termsText}>
+                  For questions about these Terms & Conditions, please contact our support team at support@lune-health.com
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modernModalFooter}>
+              <TouchableOpacity
+                style={styles.modernFullWidthButton}
+                onPress={() => setShowTermsModal(false)}
+                activeOpacity={0.9}
+              >
+                <LinearGradient
+                  colors={[COLORS.blue, COLORS.deepBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.modernFullWidthButtonGradient}
+                >
+                  <Ionicons name="checkmark-done" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
+                  <Text style={styles.modernFullWidthButtonText}>I Understand</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
       </Modal>
     </>
   );
@@ -748,7 +1369,7 @@ function EditableField({
           onChangeText={onChangeText}
           placeholder={placeholder || `Enter ${label.toLowerCase()}`}
           placeholderTextColor={COLORS.gray + '80'}
-          style={[styles.input, !editable && styles.inputDisabled]}
+          style={styles.input}
           keyboardType={keyboardType}
           editable={editable}
         />
@@ -783,6 +1404,41 @@ function SettingsItem({
       </View>
       {showChevron && <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />}
     </TouchableOpacity>
+  );
+}
+
+// Modern Toggle Item Component
+function ModernToggleItem({
+  icon,
+  label,
+  description,
+  value,
+  onValueChange,
+}: {
+  icon: any;
+  label: string;
+  description: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}) {
+  return (
+    <View style={styles.modernToggleItem}>
+      <View style={styles.modernToggleIconContainer}>
+        <Ionicons name={icon} size={20} color={COLORS.blue} />
+      </View>
+      <View style={styles.modernToggleTextContainer}>
+        <Text style={styles.modernToggleLabel}>{label}</Text>
+        <Text style={styles.modernToggleDescription}>{description}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: COLORS.gray + '30', true: COLORS.blue + '50' }}
+        thumbColor={value ? COLORS.blue : COLORS.white}
+        ios_backgroundColor={COLORS.gray + '30'}
+        style={{ transform: [{ scale: 0.9 }] }}
+      />
+    </View>
   );
 }
 
@@ -993,7 +1649,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputRowDisabled: {
-    opacity: 0.6,
+    opacity: 1,
   },
   inputIcon: {
     marginRight: 10,
@@ -1004,8 +1660,34 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: COLORS.charcoal,
   },
-  inputDisabled: {
-    opacity: 0.8,
+  genderDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.blue + '10',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 2,
+    borderColor: COLORS.blue + '30',
+  },
+  genderIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: COLORS.blue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  genderDisplayText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: COLORS.blue,
   },
   genderSelector: {
     flexDirection: 'row',
@@ -1016,17 +1698,16 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 12,
     backgroundColor: COLORS.background,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   genderOptionActive: {
     backgroundColor: COLORS.blue + '15',
     borderColor: COLORS.blue,
-  },
-  genderOptionDisabled: {
-    opacity: 0.6,
   },
   genderOptionText: {
     fontSize: 14,
@@ -1084,94 +1765,263 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Bold',
     color: COLORS.white,
   },
-  // Modal Styles
+  // Modern Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  modalContainer: {
+  modernModalContainer: {
     backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 32,
-    width: '90%',
-    maxWidth: 400,
+    borderRadius: 28,
+    padding: 28,
+    width: '100%',
+    maxWidth: 380,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.3,
-    shadowRadius: 30,
-    elevation: 10,
+    shadowOpacity: 0.25,
+    shadowRadius: 25,
+    elevation: 15,
   },
-  modalIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.blue + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
+  modernModalIconContainer: {
     marginBottom: 20,
   },
-  modalTitle: {
-    fontSize: 24,
+  modernModalIconGradient: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: COLORS.blue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modernModalTitle: {
+    fontSize: 22,
     fontFamily: 'Inter-Bold',
     color: COLORS.charcoal,
-    marginBottom: 12,
+    marginBottom: 8,
     textAlign: 'center',
   },
-  modalMessage: {
+  modernModalMessage: {
     fontSize: 15,
     fontFamily: 'Inter-Regular',
     color: COLORS.gray,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 28,
+    paddingHorizontal: 8,
   },
-  modalButtons: {
+  modernModalButtons: {
     flexDirection: 'row',
     width: '100%',
     gap: 12,
   },
-  modalButton: {
+  modernModalButton: {
     flex: 1,
-    height: 50,
-    borderRadius: 14,
+    height: 52,
+    borderRadius: 16,
     overflow: 'hidden',
   },
-  modalButtonCancel: {
+  modernModalButtonSecondary: {
     backgroundColor: COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.gray + '30',
   },
-  modalButtonConfirm: {
+  modernModalButtonPrimary: {
     overflow: 'hidden',
   },
-  modalButtonGradient: {
+  modernModalButtonGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: COLORS.blue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
-  modalButtonTextCancel: {
+  modernModalButtonTextSecondary: {
     fontSize: 15,
     fontFamily: 'Inter-Bold',
     color: COLORS.charcoal,
   },
-  modalButtonTextConfirm: {
+  modernModalButtonTextPrimary: {
     fontSize: 15,
     fontFamily: 'Inter-Bold',
     color: COLORS.white,
   },
-  modalCloseButton: {
+  // Slide Modal Styles
+  modernSlideModal: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  modalHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: COLORS.gray + '40',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  modernModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray + '20',
+  },
+  modernModalHeaderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: COLORS.blue + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  modernSlideModalTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-Bold',
+    color: COLORS.charcoal,
+    marginBottom: 2,
+  },
+  modernSlideModalSubtitle: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    color: COLORS.gray,
+  },
+  modernToggleContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    maxHeight: 380,
+  },
+  modernToggleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.gray + '20',
+  },
+  modernToggleIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: COLORS.blue,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  modernToggleTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  modernToggleLabel: {
+    fontSize: 15,
+    fontFamily: 'Inter-SemiBold',
+    color: COLORS.charcoal,
+    marginBottom: 4,
+  },
+  modernToggleDescription: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    color: COLORS.gray,
+    lineHeight: 18,
+  },
+  modernModalFooter: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 28,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray + '20',
+  },
+  modernFullWidthButton: {
+    width: '100%',
+    height: 54,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  modernFullWidthButtonGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: COLORS.blue,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  modernFullWidthButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: COLORS.white,
+  },
+  // Terms Styles
+  termsScrollContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    maxHeight: 400,
+  },
+  termsSection: {
+    marginBottom: 24,
+  },
+  termsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  termsSectionNumber: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: COLORS.background,
+    backgroundColor: COLORS.blue + '15',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 12,
+  },
+  termsSectionNumberText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Bold',
+    color: COLORS.blue,
+  },
+  termsHeading: {
+    fontSize: 16,
+    fontFamily: 'Inter-Bold',
+    color: COLORS.charcoal,
+    flex: 1,
+  },
+  termsText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: COLORS.darkGray,
+    lineHeight: 22,
+    paddingLeft: 44,
   },
 });

@@ -93,8 +93,7 @@ Multi-language support
 
 License
 
-This project is licensed under the MIT License.
-You are free to use, modify, and distribute it with proper attribution.
+This project is licensed under the Proprietary License.
 
 Developer
 
