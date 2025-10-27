@@ -22,7 +22,7 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import RoundBackButton from '../../components/navigation/RoundBackButton';
+import { router } from 'expo-router';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -635,9 +635,19 @@ export default function MedGuideScreen() {
         <View style={styles.container}>
           <View style={styles.header}>
             <View style={styles.headerContent}>
-              <View style={styles.navigationCard}>
-                <RoundBackButton />
-              </View>
+              <TouchableOpacity
+                style={styles.navigationCard}
+                onPress={() => router.back()}
+                activeOpacity={0.7}
+              >
+                <View style={styles.backButtonContainer}>
+                  <Image 
+                    source={require('../../assets/navigation/left.png')}
+                    style={styles.backIcon}
+                    contentFit="contain"
+                  />
+                </View>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -758,7 +768,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   navigationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     alignSelf: 'flex-start',
+  },
+  backButtonContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    width: 22,
+    height: 22,
   },
   keyboardView: {
     flex: 1,

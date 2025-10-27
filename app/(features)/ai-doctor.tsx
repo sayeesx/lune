@@ -28,7 +28,6 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import RoundBackButton from '../../components/navigation/RoundBackButton';
 import useDoctor, { Message } from '../../src/hooks/useDoctor';
 
 
