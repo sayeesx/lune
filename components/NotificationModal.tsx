@@ -19,6 +19,7 @@ interface Notification {
   id: string;
   title: string;
   message: string;
+  body?: string;
   type: 'info' | 'success' | 'warning' | 'error';
   read: boolean;
   created_at: string;
@@ -36,23 +37,39 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isVisible) {
       setLoading(true);
       fetchNotifications();
-      Animated.spring(slideAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-        tension: 65,
-        friction: 11,
-      }).start();
+      
+      Animated.parallel([
+        Animated.spring(slideAnim, {
+          toValue: 1,
+          useNativeDriver: true,
+          tension: 50,
+          friction: 10,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
   }, [isVisible]);
 
@@ -110,47 +127,76 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
     }
   };
 
-const renderNotification = ({ item }: { item: Notification }) => {
-  const backgroundColor = item.read ? '#F5F6FA' : '#FFFFFF';
-  const typeColors = {
-    info: '#2652F9',
-    success: '#4CAF50',
-    warning: '#FFA000',
-    error: '#F44336',
+  const handleNotificationPress = (item: Notification) => {
+    if (!item.read) markAsRead(item.id);
+    if (item.nav_path) {
+      onClose();
+      router.push(item.nav_path as any);
+    }
   };
 
-  return (
-    <View style={[styles.notificationItem, { backgroundColor }]}>
-      <View style={[styles.typeIndicator, { backgroundColor: typeColors[item.type] }]} />
-      <View style={styles.notificationContent}>
-        <Text style={styles.title}>{item.title}</Text>
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-        {/* ✅ Fixed: show body or message */}
-        <Text style={styles.message}>{item.body || item.message}</Text>
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
 
-        <Text style={styles.timestamp}>
-          {new Date(item.created_at).toLocaleDateString()}
-        </Text>
-      </View>
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'success': return '✓';
+      case 'warning': return '⚠';
+      case 'error': return '✕';
+      default: return 'ⓘ';
+    }
+  };
 
+  const renderNotification = ({ item }: { item: Notification }) => {
+    const typeColors = {
+      info: '#007AFF',
+      success: '#34C759',
+      warning: '#FF9500',
+      error: '#FF3B30',
+    };
+
+    return (
       <TouchableOpacity
-        onPress={() => {
-          if (!item.read) markAsRead(item.id);
-          if (item.nav_path) router.push(item.nav_path);
-        }}
-        style={styles.arrowButton}
-        activeOpacity={0.8}
+        style={[
+          styles.notificationItem,
+          !item.read && styles.unreadNotification,
+        ]}
+        onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.6}
       >
-        <Image
-          source={require('@/assets/navigation/left.png')}
-          style={styles.arrowIcon}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
-    </View>
-  );
-};
+        <View style={[styles.iconContainer, { backgroundColor: `${typeColors[item.type]}15` }]}>
+          <Text style={[styles.iconText, { color: typeColors[item.type] }]}>
+            {getTypeIcon(item.type)}
+          </Text>
+        </View>
 
+        <View style={styles.contentWrapper}>
+          <View style={styles.headerRow}>
+            <Text style={styles.title} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={styles.time}>{formatTime(item.created_at)}</Text>
+          </View>
+          
+          <Text style={styles.message} numberOfLines={2}>
+            {item.body || item.message}
+          </Text>
+        </View>
+
+        {!item.read && <View style={styles.unreadDot} />}
+      </TouchableOpacity>
+    );
+  };
 
   const translateY = slideAnim.interpolate({
     inputRange: [0, 1],
@@ -165,160 +211,232 @@ const renderNotification = ({ item }: { item: Notification }) => {
       transparent={true}
       statusBarTranslucent
     >
-      <View style={styles.modalOverlay}>
+      <Animated.View style={[styles.modalOverlay, { opacity: overlayOpacity }]}>
         <TouchableOpacity
           style={StyleSheet.absoluteFill}
           activeOpacity={1}
           onPress={onClose}
         />
-        <Animated.View
-          style={[
-            styles.modalContent,
-            {
-              paddingBottom: insets.bottom || 16,
-              transform: [{ translateY }],
-            },
-          ]}
-        >
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Notifications</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeButtonText}>✕</Text>
-            </TouchableOpacity>
-          </View>
+      </Animated.View>
 
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#2652F9" />
-            </View>
-          ) : notifications.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No notifications</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={notifications}
-              renderItem={renderNotification}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.notificationsList}
+      <Animated.View
+        style={[
+          styles.modalContent,
+          {
+            paddingBottom: Math.max(insets.bottom, 20),
+            transform: [{ translateY }],
+          },
+        ]}
+      >
+        {/* Handle bar */}
+        <View style={styles.handleContainer}>
+          <View style={styles.handle} />
+        </View>
+
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalTitle}>Notifications</Text>
+          <TouchableOpacity 
+            onPress={onClose} 
+            style={styles.closeButton}
+            activeOpacity={0.6}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Image
+              source={require('@/assets/navigation/close.png')}
+              style={styles.closeIcon}
+              resizeMode="contain"
             />
-          )}
-        </Animated.View>
-      </View>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+          </View>
+        ) : notifications.length === 0 ? (
+          <View style={styles.centerContainer}>
+            <View style={styles.emptyIconContainer}>
+              <Text style={styles.emptyIcon}>🔔</Text>
+            </View>
+            <Text style={styles.emptyTitle}>No Notifications</Text>
+            <Text style={styles.emptyText}>
+              You're all caught up!
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={notifications}
+            renderItem={renderNotification}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.notificationsList}
+          />
+        )}
+      </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '85%',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#F2F2F7',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  handleContainer: {
+    alignItems: 'center',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#C6C6C8',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 8,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8EAEE',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontFamily: 'Inter-Bold',
-    color: '#100F15',
+    color: '#000000',
+    letterSpacing: 0.35,
   },
   closeButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#F5F6FA',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(120, 120, 128, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  closeButtonText: {
-    fontSize: 20,
-    color: '#4A4A4D',
-    fontFamily: 'Inter-Medium',
+  closeIcon: {
+    width: 12,
+    height: 12,
+    tintColor: '#8E8E93',
   },
   notificationsList: {
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingBottom: 16,
   },
   notificationItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+    alignItems: 'flex-start',
+    padding: 14,
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E8EAEE',
-    shadowColor: '#100F15',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
     elevation: 1,
   },
-  typeIndicator: {
-    width: 4,
-    borderRadius: 2,
-    marginRight: 12,
-    alignSelf: 'stretch',
+  unreadNotification: {
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  notificationContent: {
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  iconText: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  contentWrapper: {
     flex: 1,
+    marginRight: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   title: {
+    flex: 1,
     fontSize: 15,
     fontFamily: 'Inter-SemiBold',
-    color: '#100F15',
-    marginBottom: 4,
+    color: '#000000',
+    letterSpacing: -0.24,
+    marginRight: 8,
+  },
+  time: {
+    fontSize: 13,
+    fontFamily: 'Inter-Regular',
+    color: '#8E8E93',
+    letterSpacing: -0.08,
   },
   message: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#4A4A4D',
-    marginBottom: 8,
+    color: '#3C3C43',
     lineHeight: 20,
+    letterSpacing: -0.15,
+    opacity: 0.8,
   },
-  timestamp: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#9199B1',
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007AFF',
+    marginTop: 4,
   },
-  arrowButton: {
-    alignSelf: 'center',
-    padding: 6,
-  },
-  arrowIcon: {
-    width: 20,
-    height: 20,
-    tintColor: '#2652F9',
-    transform: [{ rotate: '180deg' }], // rotates left arrow to point right
-  },
-  loadingContainer: {
-    padding: 48,
+  centerContainer: {
+    paddingVertical: 80,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyContainer: {
-    padding: 48,
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(120, 120, 128, 0.08)',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyIcon: {
+    fontSize: 40,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter-SemiBold',
+    color: '#000000',
+    marginBottom: 8,
+    letterSpacing: 0.38,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: 'Inter-Regular',
-    color: '#9199B1',
+    color: '#8E8E93',
+    textAlign: 'center',
+    letterSpacing: -0.24,
   },
 });

@@ -28,12 +28,6 @@ export default function FeaturesLayout() {
         }} 
       />
       <Stack.Screen 
-        name="rx-scan" 
-        options={{ 
-          title: 'Rx Scan',
-        }} 
-      />
-      <Stack.Screen 
         name="lab-sense" 
         options={{ 
           title: 'Lab Sense',
@@ -45,12 +39,7 @@ export default function FeaturesLayout() {
           title: 'Med Guide',
         }} 
       />
-      <Stack.Screen 
-        name="scan-vision" 
-        options={{ 
-          title: 'Scan Vision',
-        }} 
-      />
+      {/* Removed rx-scan and scan-vision screens */}
       <Stack.Screen 
         name="symptom-ai" 
         options={{ 

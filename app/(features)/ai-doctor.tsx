@@ -31,10 +31,10 @@ import {
 import useDoctor, { Message } from '../../src/hooks/useDoctor';
 
 
-// Enable LayoutAnimation on Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// LayoutAnimation: removed call to UIManager.setLayoutAnimationEnabledExperimental
+// because in the New Architecture this is a no-op and emits a warning. If you
+// need animation, use LayoutAnimation APIs directly or enable it conditionally
+// for older architectures.
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');

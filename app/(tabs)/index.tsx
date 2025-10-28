@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { useFocusEffect } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
-import { router } from "expo-router"
+import { router, Redirect } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import {
@@ -53,20 +53,6 @@ const healthcareFeatures = [
     title: "Medical Translation",
     description: "Translate medical terms",
     route: "/(features)/medical-translation",
-  },
-  {
-    key: "rx-scan",
-    iconSource: require("@/assets/feature-icons/rxscan.png"),
-    title: "Rx Scan",
-    description: "Scan prescriptions",
-    route: "/(features)/rx-scan",
-  },
-  {
-    key: "scan-vision",
-    iconSource: require("@/assets/feature-icons/scanvision.png"),
-    title: "ScanVision",
-    description: "Medical image analysis",
-    route: "/(features)/scan-vision",
   },
 ]
 
@@ -140,18 +126,22 @@ export default function HomeScreen() {
   const [isPro, setIsPro] = useState<boolean>(false)
   const [isNotificationsVisible, setIsNotificationsVisible] = useState(false)
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [shouldStartAnimation, setShouldStartAnimation] = useState<boolean>(false)
+  
+  // Track if initial load has completed to prevent multiple loading animations
+  const hasInitiallyLoaded = useRef(false)
+  const fadeAnim = useRef(new Animated.Value(0)).current
+  const spinValue = useRef(new Animated.Value(0)).current
+  const keyboardHeight = useRef(new Animated.Value(0)).current
 
   const handleNotificationsPress = () => {
     setIsNotificationsVisible(true)
   }
-  const keyboardHeight = useRef(new Animated.Value(0)).current
-  const fadeAnim = useRef(new Animated.Value(0)).current
-  const spinValue = useRef(new Animated.Value(0)).current
 
-  // Spinner animation - only runs during loading
+  // Spinner animation - only runs during initial loading
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading && !hasInitiallyLoaded.current) {
       const spin = Animated.loop(
         Animated.timing(spinValue, {
           toValue: 1,
@@ -169,6 +159,7 @@ export default function HomeScreen() {
     outputRange: ['0deg', '360deg'],
   })
 
+  // Keyboard handling
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
@@ -195,11 +186,27 @@ export default function HomeScreen() {
     }
   }, [keyboardHeight])
 
+  // Initial authentication and data loading
   useEffect(() => {
     let isMounted = true
     
     const loadData = async () => {
       try {
+        // Check authentication first
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !sessionData.session) {
+          if (isMounted) {
+            setIsAuthenticated(false)
+            setIsLoading(false)
+            hasInitiallyLoaded.current = true
+          }
+          return
+        }
+
+        // User is authenticated
+        setIsAuthenticated(true)
+
         // Preload all images
         const imagesToPreload = [
           premiumIcon,
@@ -212,57 +219,25 @@ export default function HomeScreen() {
           Image.prefetch(Image.resolveAssetSource(imageSource).uri).catch(() => {})
         )
 
-        // Fetch session data
-        const sessionPromise = supabase.auth.getSession()
-
-        // Wait for both images and session
-        const [sessionResult] = await Promise.all([
-          sessionPromise,
-          ...imagePromises,
-        ])
-
-        const { data: sessionData, error: sessionError } = sessionResult
-        
-        if (sessionError) {
-          console.error("Session error:", sessionError)
-          if (isMounted) {
-            setDisplayName(DEFAULT_NAME)
-            setIsLoading(false)
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 300,
-              useNativeDriver: true,
-            }).start(() => {
-              setShouldStartAnimation(true)
-            })
-          }
-          return
-        }
-        
-        if (!sessionData.session) {
-          if (isMounted) {
-            setDisplayName(DEFAULT_NAME)
-            setIsLoading(false)
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 300,
-              useNativeDriver: true,
-            }).start(() => {
-              setShouldStartAnimation(true)
-            })
-          }
-          return
-        }
-
-        // Try to get profile from database
-        const { data: profile, error: profileError } = await supabase
+        // Fetch profile data
+        const profilePromise = supabase
           .from("profiles")
           .select("full_name, is_pro")
           .eq("id", sessionData.session.user.id)
           .single()
+
+        // Wait for both images and profile
+        const [profileResult] = await Promise.all([
+          profilePromise,
+          ...imagePromises,
+        ])
+
+        const { data: profile, error: profileError } = profileResult
         
         if (profileError && profileError.code !== 'PGRST116') {
-          console.error("Profile fetch error:", profileError)
+          if (process.env.NODE_ENV !== "production") {
+            console.error("Profile fetch error:", profileError)
+          }
         }
         
         if (isMounted) {
@@ -288,6 +263,8 @@ export default function HomeScreen() {
 
           // Show content after everything is loaded
           setIsLoading(false)
+          hasInitiallyLoaded.current = true
+          
           Animated.timing(fadeAnim, {
             toValue: 1,
             duration: 300,
@@ -298,27 +275,47 @@ export default function HomeScreen() {
           })
         }
       } catch (error) {
-        console.error("Error fetching user data:", error)
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Error fetching user data:", error)
+        }
         if (isMounted) {
-          setDisplayName(DEFAULT_NAME)
+          setIsAuthenticated(false)
           setIsLoading(false)
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }).start(() => {
-            setShouldStartAnimation(true)
-          })
+          hasInitiallyLoaded.current = true
         }
       }
     }
 
-    loadData()
+    // Only load if this is the first time
+    if (!hasInitiallyLoaded.current) {
+      loadData()
+    }
     
     return () => {
       isMounted = false
     }
   }, [])
+
+  // Handle smooth animations when returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      // Only run smooth transition if already loaded
+      if (hasInitiallyLoaded.current && fadeAnim._value === 0) {
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start()
+      }
+
+      // Reset fade for next unfocus
+      return () => {
+        if (hasInitiallyLoaded.current) {
+          fadeAnim.setValue(0)
+        }
+      }
+    }, [])
+  )
 
   const handleSendMessage = useCallback((text: string) => {
     if (text.trim()) {
@@ -352,8 +349,22 @@ export default function HomeScreen() {
     router.push(route as any)
   }, [])
 
-  // Loading screen
-  if (isLoading) {
+  // Redirect to auth if not authenticated.
+  // Use an effect + router.replace so navigation happens outside render
+  // and we replace history (prevents going back to protected screens).
+  useEffect(() => {
+    if (!isLoading && isAuthenticated === false) {
+      router.replace('/auth/login')
+    }
+  }, [isLoading, isAuthenticated])
+
+  if (!isLoading && isAuthenticated === false) {
+    // While router.replace runs, render nothing from this screen.
+    return null
+  }
+
+  // Loading screen - only shown on initial load
+  if (isLoading && !hasInitiallyLoaded.current) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
@@ -418,6 +429,7 @@ export default function HomeScreen() {
           <NotificationModal
             isVisible={isNotificationsVisible}
             onClose={() => setIsNotificationsVisible(false)}
+            closeIcon={require("../../assets/navigation/close.png")}
           />
 
           <View style={styles.greetingSection}>

@@ -8,12 +8,12 @@ const supabaseUrl = (Constants.expoConfig?.extra?.supabaseUrl as string) || (pro
 const supabaseAnonKey = (Constants.expoConfig?.extra?.supabaseAnonKey as string) || (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string);
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Supabase URL:', supabaseUrl);
-  console.error('Supabase Anon Key:', supabaseAnonKey ? '[PRESENT]' : '[MISSING]');
+  // Avoid printing sensitive values to logs. Provide a generic error instead.
+  console.error('Supabase initialization failed: missing environment variables.');
   throw new Error('Missing Supabase environment variables');
 }
 
-console.log('Supabase client initializing with URL:', supabaseUrl);
+// Intentionally do NOT log the Supabase URL or anon key to prevent leaking secrets in logs.
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
