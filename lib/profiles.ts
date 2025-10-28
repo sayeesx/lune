@@ -14,6 +14,7 @@ export type Profile = {
   medical_history: any | null; // jsonb
   current_medications: any | null; // jsonb
   health_goals: any | null; // jsonb
+  privacy_settings?: any | null; // optional jsonb for privacy preferences
   last_checkup_date: string | null; // ISO date (YYYY-MM-DD)
   settings: any | null; // jsonb
   role: 'user' | 'admin' | string;

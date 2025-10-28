@@ -117,7 +117,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   secondary: {
-    backgroundColor: colors.secondary,
+    // colors.secondary isn't defined in theme/colors.ts — fall back to primaryAlt
+    backgroundColor: (colors as any).secondary ?? colors.primaryAlt,
   },
   outline: {
     backgroundColor: 'transparent',

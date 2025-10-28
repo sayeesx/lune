@@ -640,7 +640,7 @@ export default function ProfileScreen() {
             <View style={styles.statItem}>
               <Text style={[
                 styles.statValue,
-                bmi && { color: getBMICategory(bmi).color }
+                { ...(typeof bmi === 'number' ? { color: getBMICategory(bmi).color } : {}) }
               ]}>
                 {bmi ? bmi.toFixed(1) : '--'}
               </Text>

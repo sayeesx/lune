@@ -10,7 +10,7 @@ export default function RoundBackButton({ to = '/(tabs)' }: { to?: string }) {
   return (
     <View style={[styles.container, { top: (insets.top || (Platform.OS === 'ios' ? 44 : 20)) + 8 }]}>
       <TouchableOpacity
-        onPress={() => router.replace(to)}
+  onPress={() => router.replace(to as any)}
         activeOpacity={0.8}
         style={styles.button}
       >

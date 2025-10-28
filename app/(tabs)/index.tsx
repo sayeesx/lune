@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabaseClient"
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons"
 import { useFocusEffect } from "@react-navigation/native"
 import { LinearGradient } from "expo-linear-gradient"
-import { router, Redirect } from "expo-router"
+import { router } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import {
@@ -300,7 +300,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       // Only run smooth transition if already loaded
-      if (hasInitiallyLoaded.current && fadeAnim._value === 0) {
+      if (hasInitiallyLoaded.current) {
         Animated.timing(fadeAnim, {
           toValue: 1,
           duration: 200,
@@ -429,7 +429,6 @@ export default function HomeScreen() {
           <NotificationModal
             isVisible={isNotificationsVisible}
             onClose={() => setIsNotificationsVisible(false)}
-            closeIcon={require("../../assets/navigation/close.png")}
           />
 
           <View style={styles.greetingSection}>

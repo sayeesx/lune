@@ -1,7 +1,8 @@
 import RoundBackButton from '../../components/navigation/RoundBackButton';
 import { TOP_NAV_HEIGHT } from '@/components/TopNavBar';
 import React from 'react';
-import { SafeAreaView, ScrollView, StatusBar, View } from 'react-native';
+import { SafeAreaView, ScrollView, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 export default function LabSenseScreen() {
   return (
