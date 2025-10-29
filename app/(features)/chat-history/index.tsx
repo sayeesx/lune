@@ -47,7 +47,7 @@ export default function ChatHistoryScreen() {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [chatList, setChatList] = useState<Array<{ id: string; title: string }>>([]);
+  const [chatList, setChatList] = useState<{ id: string; title: string }[]>([]);
   const [showChatList, setShowChatList] = useState(true);
 
   const flatListRef = useRef<FlatList>(null);

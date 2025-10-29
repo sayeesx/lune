@@ -177,7 +177,7 @@ export default function PremiumScreen() {
 
         {/* Features */}
         <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>What's Included</Text>
+          <Text style={styles.sectionTitle}>What’s Included</Text>
           <View style={styles.featuresList}>
             {premiumFeatures.map((feature, index) => (
               <View key={index} style={styles.featureItem}>

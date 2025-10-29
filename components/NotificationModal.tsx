@@ -260,7 +260,7 @@ export default function NotificationModal({ isVisible, onClose }: NotificationMo
             </View>
             <Text style={styles.emptyTitle}>No Notifications</Text>
             <Text style={styles.emptyText}>
-              You're all caught up!
+              You’re all caught up!
             </Text>
           </View>
         ) : (

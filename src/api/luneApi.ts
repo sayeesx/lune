@@ -22,13 +22,13 @@ client.interceptors.request.use(
   (req) => {
     try {
       // keep logs minimal in production
-      // eslint-disable-next-line no-console
+       
       console.log('[API] Request:', req.method, req.url);
     } catch (e) {}
     return req;
   },
   (err) => {
-    // eslint-disable-next-line no-console
+     
     console.warn('[API] Request error:', err?.message || err);
     return Promise.reject(err);
   }
@@ -38,13 +38,13 @@ client.interceptors.request.use(
 client.interceptors.response.use(
   (res) => {
     try {
-      // eslint-disable-next-line no-console
+       
       console.log('[API] Response:', res.status, res.config.url);
     } catch (e) {}
     return res;
   },
   (err) => {
-    // eslint-disable-next-line no-console
+     
     console.warn('[API] Response error:', err?.response?.status, err?.message || err);
     return Promise.reject(err);
   }
@@ -74,7 +74,7 @@ const post = async <T = any>(endpoint: string, payload: any = {}): Promise<ApiRe
   }
 };
 
-export const consultDoctor = async (message: string, conversationHistory: Array<{ role: string; content: string }> = []): Promise<ApiResponse> => {
+export const consultDoctor = async (message: string, conversationHistory: { role: string; content: string }[] = []): Promise<ApiResponse> => {
   return post(ENDPOINTS.doctor, { message, conversationHistory });
 };
 

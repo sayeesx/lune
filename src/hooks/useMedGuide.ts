@@ -3,7 +3,7 @@ import { getMedicineInfo } from '../api/luneApi';
 
 export default function useMedGuide() {
   const [medicineInfo, setMedicineInfo] = useState<any | null>(null);
-  const [searchHistory, setSearchHistory] = useState<Array<{ term: string; timestamp: string }>>([]);
+  const [searchHistory, setSearchHistory] = useState<{ term: string; timestamp: string }[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 

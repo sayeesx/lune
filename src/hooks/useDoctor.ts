@@ -26,7 +26,7 @@ export default function useDoctor() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const sendMessage = async (userMessage: string, conversationHistory: Array<{ role: string; content: string }> = []) => {
+  const sendMessage = async (userMessage: string, conversationHistory: { role: string; content: string }[] = []) => {
     setError(null);
     setLoading(true);
     try {

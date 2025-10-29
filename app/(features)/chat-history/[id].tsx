@@ -79,7 +79,7 @@ const TypingIndicator = React.memo(() => {
       anim2.stop();
       anim3.stop();
     };
-  }, []);
+  }, [dot1, dot2, dot3]);
 
   return (
     <View style={styles.typingIndicatorContainer}>
@@ -89,6 +89,8 @@ const TypingIndicator = React.memo(() => {
     </View>
   );
 });
+// Give memoized component a display name for eslint/react
+TypingIndicator.displayName = 'TypingIndicator';
 
 // Animated Loading Dots Component (for send button)
 const LoadingDots = React.memo(() => {
@@ -130,7 +132,7 @@ const LoadingDots = React.memo(() => {
       anim2.stop();
       anim3.stop();
     };
-  }, []);
+  }, [dot1, dot2, dot3]);
 
   const opacity1 = dot1.interpolate({
     inputRange: [0, 1],
@@ -153,6 +155,8 @@ const LoadingDots = React.memo(() => {
     </View>
   );
 });
+// Give memoized component a display name for eslint/react
+LoadingDots.displayName = 'LoadingDots';
 
 // Animated Message Bubble Component - OPTIMIZED for smooth typing
 interface AnimatedMessageBubbleProps {

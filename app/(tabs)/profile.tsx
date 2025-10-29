@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Image,
   Modal,
   RefreshControl,
@@ -20,8 +21,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
+import ProfileScreenSkeleton from '@/components/ProfileScreenSkeleton';
+import AgePicker from '@/components/AgePicker';
 
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 const COLORS = {
   white: '#FFFFFF',
@@ -33,17 +38,22 @@ const COLORS = {
   background: '#F8F9FC',
 };
 
-
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showMedicalDataModal, setShowMedicalDataModal] = useState(false);
+  const [showAgePickerModal, setShowAgePickerModal] = useState(false);
+  const [turningOffNotifications, setTurningOffNotifications] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [savingMedicalData, setSavingMedicalData] = useState(false);
   
   // Edit mode for cards
   const [editingPersonal, setEditingPersonal] = useState(false);
@@ -59,6 +69,7 @@ export default function ProfileScreen() {
   const [location, setLocation] = useState('');
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
+  const [age, setAge] = useState<number>(18);
   const [bmi, setBmi] = useState<number | null>(null);
 
   // Privacy & Notifications Settings
@@ -73,7 +84,7 @@ export default function ProfileScreen() {
   // Modal animations
   const [modalOpacity] = useState(new Animated.Value(0));
   const [modalScale] = useState(new Animated.Value(0.9));
-  const [slideModalTranslateY] = useState(new Animated.Value(300));
+  const [slideModalTranslateY] = useState(new Animated.Value(screenHeight));
 
   useEffect(() => {
     loadProfile();
@@ -111,7 +122,7 @@ export default function ProfileScreen() {
   }, [showSignOutModal, showNotificationsModal]);
 
   useEffect(() => {
-    if (showPrivacyModal || showTermsModal || showMedicalDataModal) {
+    if (showPrivacyModal || showTermsModal || showMedicalDataModal || showAgePickerModal) {
       Animated.parallel([
         Animated.timing(modalOpacity, {
           toValue: 1,
@@ -133,13 +144,13 @@ export default function ProfileScreen() {
           useNativeDriver: true,
         }),
         Animated.timing(slideModalTranslateY, {
-          toValue: 300,
+          toValue: screenHeight,
           duration: 250,
           useNativeDriver: true,
         }),
       ]).start();
     }
-  }, [showPrivacyModal, showTermsModal, showMedicalDataModal]);
+  }, [showPrivacyModal, showTermsModal, showMedicalDataModal, showAgePickerModal]);
 
   const getBMICategory = (bmiValue: number) => {
     if (bmiValue < 18.5) return { category: 'Underweight', color: '#FFC107' };
@@ -204,6 +215,7 @@ export default function ProfileScreen() {
         setPhone(data.phone ?? '');
         setGender((data.gender as any) ?? 'Male');
         setLocation(data.location ?? '');
+        setAge(data.age ?? 18);
         
         if (data.health_goals) {
           const goals = data.health_goals as any;
@@ -351,6 +363,7 @@ export default function ProfileScreen() {
       const { error } = await updateMyProfile({
         full_name: fullName,
         gender,
+        age,
         health_goals: healthGoals,
       });
       
@@ -428,6 +441,7 @@ export default function ProfileScreen() {
 
   const handleTurnOffNotifications = async () => {
     try {
+      setTurningOffNotifications(true);
       const privacySettings = {
         notifications_enabled: false,
         share_health_data: shareHealthData,
@@ -463,11 +477,14 @@ export default function ProfileScreen() {
         position: 'top',
         topOffset: 60,
       });
+    } finally {
+      setTurningOffNotifications(false);
     }
   };
 
   const handleSavePrivacySettings = async () => {
     try {
+      setSavingPrivacy(true);
       const privacySettings = {
         notifications_enabled: notificationsEnabled,
         share_health_data: shareHealthData,
@@ -502,11 +519,14 @@ export default function ProfileScreen() {
         position: 'top',
         topOffset: 60,
       });
+    } finally {
+      setSavingPrivacy(false);
     }
   };
 
   const handleSaveMedicalDataAccess = async () => {
     try {
+      setSavingMedicalData(true);
       const privacySettings = {
         notifications_enabled: notificationsEnabled,
         share_health_data: shareHealthData,
@@ -541,14 +561,22 @@ export default function ProfileScreen() {
         position: 'top',
         topOffset: 60,
       });
+    } finally {
+      setSavingMedicalData(false);
     }
   };
 
   const handleSignOutConfirm = async () => {
-    setShowSignOutModal(false);
-    await AsyncStorage.clear();
-    await supabase.auth.signOut();
-    router.replace('/auth/login');
+    try {
+      setSigningOut(true);
+      await AsyncStorage.clear();
+      await supabase.auth.signOut();
+      router.replace('/auth/login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+      setSigningOut(false);
+      setShowSignOutModal(false);
+    }
   };
 
   const getInitials = () => {
@@ -567,11 +595,7 @@ export default function ProfileScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.blue} />
-      </View>
-    );
+    return <ProfileScreenSkeleton />;
   }
 
   return (
@@ -597,27 +621,29 @@ export default function ProfileScreen() {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={pickImage} activeOpacity={0.8} disabled={uploadingImage}>
             <View style={styles.avatarContainer}>
-              {profile?.profile_picture_url ? (
-                <Image
-                  source={{ uri: profile.profile_picture_url }}
-                  style={styles.avatar}
-                />
-              ) : (
-                <LinearGradient
-                  colors={[COLORS.blue, COLORS.deepBlue]}
-                  style={styles.avatarGradient}
-                >
-                  <Text style={styles.avatarText}>{getInitials()}</Text>
-                </LinearGradient>
-              )}
-              
-              {uploadingImage && (
-                <View style={styles.uploadingOverlay}>
-                  <ActivityIndicator size="large" color={COLORS.white} />
-                  <Text style={styles.uploadingText}>Uploading...</Text>
-                </View>
-              )}
-              
+              <View style={styles.avatarWrapper}>
+                {profile?.profile_picture_url ? (
+                  <Image
+                    source={{ uri: profile.profile_picture_url }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Image
+                    source={require('@/assets/home-icons/profile.png')}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                )}
+
+                {uploadingImage && (
+                  <View style={styles.uploadingOverlay}>
+                    <ActivityIndicator size="large" color={COLORS.white} />
+                    <Text style={styles.uploadingText}>Uploading...</Text>
+                  </View>
+                )}
+              </View>
+
               {!uploadingImage && (
                 <View style={styles.editIconContainer}>
                   <Ionicons name="camera" size={18} color={COLORS.white} />
@@ -653,13 +679,8 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>
-                {profile?.last_checkup_date ? 
-                  new Date(profile.last_checkup_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) 
-                  : '--'
-                }
-              </Text>
-              <Text style={styles.statLabel}>Last Checkup</Text>
+              <Text style={styles.statValue}>{age}</Text>
+              <Text style={styles.statLabel}>Age</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
@@ -709,7 +730,30 @@ export default function ProfileScreen() {
             editable={editingPersonal}
           />
 
-          {/* Gender Display - Show only selected with icon */}
+          {/* Age Picker */}
+          {!editingPersonal ? (
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Age</Text>
+              <View style={styles.ageDisplayContainer}>
+                <Ionicons name="calendar-outline" size={18} color={COLORS.charcoal} style={styles.inputIcon} />
+                <Text style={styles.ageDisplayText}>{age} years old</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Age</Text>
+              <TouchableOpacity 
+                style={styles.agePickerButton}
+                onPress={() => setShowAgePickerModal(true)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={18} color={COLORS.charcoal} style={styles.inputIcon} />
+                <Text style={styles.agePickerButtonText}>{age} years old</Text>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {!editingPersonal ? (
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>Gender</Text>
@@ -899,18 +943,76 @@ export default function ProfileScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Sign Out Confirmation Modal */}
+      {/* Age Picker Modal */}
       <Modal
-        visible={showSignOutModal}
+        visible={showAgePickerModal}
         transparent
         animationType="none"
-        onRequestClose={() => setShowSignOutModal(false)}
+        onRequestClose={() => setShowAgePickerModal(false)}
       >
         <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
           <TouchableOpacity 
             style={StyleSheet.absoluteFill} 
             activeOpacity={1} 
-            onPress={() => setShowSignOutModal(false)}
+            onPress={() => setShowAgePickerModal(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.slideUpModal,
+              { transform: [{ translateY: slideModalTranslateY }] },
+            ]}
+          >
+            <View style={styles.slideUpModalHandle} />
+            
+            <View style={styles.slideUpModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={styles.slideUpModalIconContainer}>
+                  <Ionicons name="calendar" size={24} color={COLORS.blue} />
+                </View>
+                <Text style={styles.slideUpModalTitle}>Select Your Age</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowAgePickerModal(false)}>
+                <Ionicons name="close" size={28} color={COLORS.gray} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.agePickerContainer}>
+              <AgePicker value={age} onChange={setAge} />
+            </View>
+
+            <View style={[styles.slideUpModalFooter, { paddingBottom: insets.bottom || 20 }]}>
+              <TouchableOpacity
+                style={styles.slideUpModalSaveButton}
+                onPress={() => setShowAgePickerModal(false)}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={[COLORS.blue, COLORS.deepBlue]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.slideUpModalSaveGradient}
+                >
+                  <Text style={styles.slideUpModalSaveText}>Confirm Age</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </Animated.View>
+      </Modal>
+
+      {/* Sign Out Confirmation Modal */}
+      <Modal
+        visible={showSignOutModal}
+        transparent
+        animationType="none"
+        onRequestClose={() => !signingOut && setShowSignOutModal(false)}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: modalOpacity }]}>
+          <TouchableOpacity 
+            style={StyleSheet.absoluteFill} 
+            activeOpacity={1} 
+            onPress={() => !signingOut && setShowSignOutModal(false)}
+            disabled={signingOut}
           />
           <Animated.View 
             style={[
@@ -940,6 +1042,7 @@ export default function ProfileScreen() {
                 style={[styles.modernModalButton, styles.modernModalButtonSecondary]}
                 onPress={() => setShowSignOutModal(false)}
                 activeOpacity={0.8}
+                disabled={signingOut}
               >
                 <Text style={styles.modernModalButtonTextSecondary}>Cancel</Text>
               </TouchableOpacity>
@@ -948,6 +1051,7 @@ export default function ProfileScreen() {
                 style={[styles.modernModalButton, styles.modernModalButtonPrimary]}
                 onPress={handleSignOutConfirm}
                 activeOpacity={0.8}
+                disabled={signingOut}
               >
                 <LinearGradient
                   colors={['#FF3B30', '#C62828']}
@@ -955,7 +1059,11 @@ export default function ProfileScreen() {
                   end={{ x: 1, y: 0 }}
                   style={styles.modernModalButtonGradient}
                 >
-                  <Text style={styles.modernModalButtonTextPrimary}>Sign Out</Text>
+                  {signingOut ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.modernModalButtonTextPrimary}>Sign Out</Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -990,13 +1098,17 @@ export default function ProfileScreen() {
                 colors={[COLORS.blue, COLORS.deepBlue]}
                 style={styles.modernModalIconGradient}
               >
-                <Ionicons name="notifications-off" size={32} color={COLORS.white} />
+                <Ionicons name="notifications" size={32} color={COLORS.white} />
               </LinearGradient>
             </View>
             
-            <Text style={styles.modernModalTitle}>Turn Off Notifications?</Text>
+            <Text style={styles.modernModalTitle}>
+              {notificationsEnabled ? 'Turn Off Notifications?' : 'Enable Notifications?'}
+            </Text>
             <Text style={styles.modernModalMessage}>
-              You won't receive health reminders, appointment alerts, or important updates
+              {notificationsEnabled 
+                ? 'You will no longer receive notifications about your health updates, reminders, and important alerts.'
+                : 'Stay informed about your health updates, medication reminders, and important alerts.'}
             </Text>
 
             <View style={styles.modernModalButtons}>
@@ -1012,14 +1124,21 @@ export default function ProfileScreen() {
                 style={[styles.modernModalButton, styles.modernModalButtonPrimary]}
                 onPress={handleTurnOffNotifications}
                 activeOpacity={0.8}
+                disabled={turningOffNotifications}
               >
                 <LinearGradient
-                  colors={[COLORS.blue, COLORS.deepBlue]}
+                  colors={notificationsEnabled ? ['#FF3B30', '#C62828'] : [COLORS.blue, COLORS.deepBlue]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.modernModalButtonGradient}
                 >
-                  <Text style={styles.modernModalButtonTextPrimary}>Turn Off</Text>
+                  {turningOffNotifications ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.modernModalButtonTextPrimary}>
+                      {notificationsEnabled ? 'Turn Off' : 'Enable'}
+                    </Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1027,7 +1146,7 @@ export default function ProfileScreen() {
         </Animated.View>
       </Modal>
 
-      {/* Privacy & Permissions Modal */}
+      {/* Privacy Settings Modal */}
       <Modal
         visible={showPrivacyModal}
         transparent
@@ -1042,63 +1161,71 @@ export default function ProfileScreen() {
           />
           <Animated.View 
             style={[
-              styles.modernSlideModal,
-              {
-                opacity: modalOpacity,
-                transform: [{ translateY: slideModalTranslateY }],
-              },
+              styles.slideUpModal,
+              { transform: [{ translateY: slideModalTranslateY }] },
             ]}
           >
-            <View style={styles.modalHandle} />
+            <View style={styles.slideUpModalHandle} />
             
-            <View style={styles.modernModalHeader}>
-              <View style={styles.modernModalHeaderIcon}>
-                <Ionicons name="lock-closed" size={24} color={COLORS.blue} />
+            <View style={styles.slideUpModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={styles.slideUpModalIconContainer}>
+                  <Ionicons name="lock-closed" size={24} color={COLORS.blue} />
+                </View>
+                <Text style={styles.slideUpModalTitle}>Privacy & Permissions</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modernSlideModalTitle}>Privacy & Permissions</Text>
-                <Text style={styles.modernSlideModalSubtitle}>Manage your data preferences</Text>
-              </View>
+              <TouchableOpacity onPress={() => setShowPrivacyModal(false)}>
+                <Ionicons name="close" size={28} color={COLORS.gray} />
+              </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modernToggleContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.slideUpModalContent}
+              showsVerticalScrollIndicator={false}
+            >
               <ModernToggleItem
-                icon="fitness"
-                label="Share Health Data with AI"
-                description="Allow AI to analyze your health data for personalized insights"
+                icon="share-social"
+                label="Share Health Data"
+                description="Allow Lune to analyze and provide insights on your health data"
                 value={shareHealthData}
                 onValueChange={setShareHealthData}
               />
+              
               <ModernToggleItem
                 icon="bulb"
                 label="Personalized Recommendations"
-                description="Receive tailored health suggestions based on your profile"
+                description="Get AI-powered health recommendations tailored to your needs"
                 value={personalizedRecommendations}
                 onValueChange={setPersonalizedRecommendations}
               />
+              
               <ModernToggleItem
-                icon="bar-chart"
+                icon="stats-chart"
                 label="Data Analytics"
-                description="Help improve features through anonymous usage data"
+                description="Allow anonymous usage data to improve the app experience"
                 value={dataAnalytics}
                 onValueChange={setDataAnalytics}
               />
             </ScrollView>
 
-            <View style={styles.modernModalFooter}>
+            <View style={[styles.slideUpModalFooter, { paddingBottom: insets.bottom || 20 }]}>
               <TouchableOpacity
-                style={styles.modernFullWidthButton}
+                style={styles.slideUpModalSaveButton}
                 onPress={handleSavePrivacySettings}
-                activeOpacity={0.9}
+                activeOpacity={0.8}
+                disabled={savingPrivacy}
               >
                 <LinearGradient
                   colors={[COLORS.blue, COLORS.deepBlue]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={styles.modernFullWidthButtonGradient}
+                  style={styles.slideUpModalSaveGradient}
                 >
-                  <Ionicons name="checkmark-circle" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
-                  <Text style={styles.modernFullWidthButtonText}>Save Preferences</Text>
+                  {savingPrivacy ? (
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.slideUpModalSaveText}>Save Settings</Text>
+                  )}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1121,63 +1248,78 @@ export default function ProfileScreen() {
           />
           <Animated.View 
             style={[
-              styles.modernSlideModal,
-              {
-                opacity: modalOpacity,
-                transform: [{ translateY: slideModalTranslateY }],
-              },
+              styles.slideUpModal,
+              { transform: [{ translateY: slideModalTranslateY }] },
             ]}
           >
-            <View style={styles.modalHandle} />
+            <View style={styles.slideUpModalHandle} />
             
-            <View style={styles.modernModalHeader}>
-              <View style={styles.modernModalHeaderIcon}>
-                <Ionicons name="medkit" size={24} color={COLORS.blue} />
+            <View style={styles.slideUpModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={styles.slideUpModalIconContainer}>
+                  <Ionicons name="medkit" size={24} color={COLORS.blue} />
+                </View>
+                <Text style={styles.slideUpModalTitle}>Medical Data Access</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modernSlideModalTitle}>Medical Data Access</Text>
-                <Text style={styles.modernSlideModalSubtitle}>Control who can access your medical records</Text>
-              </View>
+              <TouchableOpacity onPress={() => setShowMedicalDataModal(false)}>
+                <Ionicons name="close" size={28} color={COLORS.gray} />
+              </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modernToggleContainer} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+              style={styles.slideUpModalContent}
+              showsVerticalScrollIndicator={false}
+            >
               <ModernToggleItem
-                icon="pulse"
-                label="AI Health Assistant"
-                description="Enable AI to access medical records for diagnosis support"
+                icon="shield-checkmark"
+                label="Medical Data Access"
+                description="Allow access to your medical records and health history"
                 value={medicalDataAccess}
                 onValueChange={setMedicalDataAccess}
               />
+              
               <ModernToggleItem
                 icon="people"
-                label="Healthcare Providers"
-                description="Share data with verified medical professionals"
+                label="Third-Party Access"
+                description="Share data with trusted healthcare providers and partners"
                 value={thirdPartyAccess}
                 onValueChange={setThirdPartyAccess}
               />
+              
               <ModernToggleItem
                 icon="flask"
                 label="Research Data Sharing"
-                description="Contribute anonymously to medical research studies"
+                description="Contribute anonymized data for medical research purposes"
                 value={researchDataSharing}
                 onValueChange={setResearchDataSharing}
               />
+
+              <View style={styles.dataInfoBox}>
+                <Ionicons name="information-circle" size={20} color={COLORS.blue} />
+                <Text style={styles.dataInfoText}>
+                  Your medical data is encrypted and securely stored. You have full control over who can access your information.
+                </Text>
+              </View>
             </ScrollView>
 
-            <View style={styles.modernModalFooter}>
+            <View style={[styles.slideUpModalFooter, { paddingBottom: insets.bottom || 20 }]}>
               <TouchableOpacity
-                style={styles.modernFullWidthButton}
-                onPress={handleSaveMedicalDataAccess}
-                activeOpacity={0.9}
+                style={styles.slideUpModalSaveButton}
+                  onPress={handleSaveMedicalDataAccess}
+                activeOpacity={0.8}
+                  disabled={savingMedicalData}
               >
                 <LinearGradient
                   colors={[COLORS.blue, COLORS.deepBlue]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={styles.modernFullWidthButtonGradient}
+                  style={styles.slideUpModalSaveGradient}
                 >
-                  <Ionicons name="shield-checkmark" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
-                  <Text style={styles.modernFullWidthButtonText}>Update Access</Text>
+                    {savingMedicalData ? (
+                      <ActivityIndicator size="small" color={COLORS.white} />
+                    ) : (
+                      <Text style={styles.slideUpModalSaveText}>Save Settings</Text>
+                    )}
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1200,137 +1342,93 @@ export default function ProfileScreen() {
           />
           <Animated.View 
             style={[
-              styles.modernSlideModal,
-              {
-                opacity: modalOpacity,
-                transform: [{ translateY: slideModalTranslateY }],
-              },
+              styles.slideUpModal,
+              { transform: [{ translateY: slideModalTranslateY }] },
             ]}
           >
-            <View style={styles.modalHandle} />
+            <View style={styles.slideUpModalHandle} />
             
-            <View style={styles.modernModalHeader}>
-              <View style={styles.modernModalHeaderIcon}>
-                <Ionicons name="document-text" size={24} color={COLORS.blue} />
+            <View style={styles.slideUpModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={styles.slideUpModalIconContainer}>
+                  <Ionicons name="document-text" size={24} color={COLORS.blue} />
+                </View>
+                <Text style={styles.slideUpModalTitle}>Terms & Conditions</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modernSlideModalTitle}>Terms & Conditions</Text>
-                <Text style={styles.modernSlideModalSubtitle}>Last updated: October 2025</Text>
-              </View>
+              <TouchableOpacity onPress={() => setShowTermsModal(false)}>
+                <Ionicons name="close" size={28} color={COLORS.gray} />
+              </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.termsScrollContainer} showsVerticalScrollIndicator={true}>
+            <ScrollView 
+              style={styles.slideUpModalContent}
+              showsVerticalScrollIndicator={false}
+            >
               <View style={styles.termsSection}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>1</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>Acceptance of Terms</Text>
-                </View>
+                <Text style={styles.termsSectionTitle}>1. Acceptance of Terms</Text>
                 <Text style={styles.termsText}>
-                  By accessing and using Lune AI Health App, you accept and agree to be bound by the terms and provision of this agreement.
+                  By accessing and using Lune, you accept and agree to be bound by the terms and provision of this agreement.
                 </Text>
               </View>
 
               <View style={styles.termsSection}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>2</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>Use of Service</Text>
-                </View>
+                <Text style={styles.termsSectionTitle}>2. Use of Service</Text>
                 <Text style={styles.termsText}>
-                  Lune provides AI-powered health insights and is not a substitute for professional medical advice. Always consult with qualified healthcare providers for medical decisions.
+                  Lune provides AI-powered health consultation and medical information services. This service is not a substitute for professional medical advice, diagnosis, or treatment.
                 </Text>
               </View>
 
               <View style={styles.termsSection}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>3</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>Privacy and Data Protection</Text>
-                </View>
+                <Text style={styles.termsSectionTitle}>3. Privacy Policy</Text>
                 <Text style={styles.termsText}>
-                  We take your privacy seriously. Your health data is encrypted and stored securely. We will never sell your personal information to third parties.
+                  Your privacy is important to us. All personal health information is encrypted and stored securely in compliance with HIPAA regulations.
                 </Text>
               </View>
 
               <View style={styles.termsSection}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>4</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>User Responsibilities</Text>
-                </View>
+                <Text style={styles.termsSectionTitle}>4. Medical Disclaimer</Text>
+                <Text style={styles.termsText}>
+                  The information provided by Lune is for informational purposes only. Always seek the advice of your physician or other qualified health provider with any questions regarding a medical condition.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <Text style={styles.termsSectionTitle}>5. Data Security</Text>
+                <Text style={styles.termsText}>
+                  We implement industry-standard security measures to protect your personal information. However, no method of transmission over the internet is 100% secure.
+                </Text>
+              </View>
+
+              <View style={styles.termsSection}>
+                <Text style={styles.termsSectionTitle}>6. User Responsibilities</Text>
                 <Text style={styles.termsText}>
                   You are responsible for maintaining the confidentiality of your account and password. You agree to accept responsibility for all activities that occur under your account.
                 </Text>
               </View>
 
-              <View style={styles.termsSection}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>5</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>Medical Disclaimer</Text>
-                </View>
-                <Text style={styles.termsText}>
-                  The information provided by Lune is for informational purposes only. It should not be considered as medical advice, diagnosis, or treatment.
+              <View style={styles.termsFooter}>
+                <Text style={styles.termsFooterText}>
+                  Last updated: October 2025
                 </Text>
-              </View>
-
-              <View style={styles.termsSection}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>6</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>Limitation of Liability</Text>
-                </View>
-                <Text style={styles.termsText}>
-                  Lune shall not be liable for any indirect, incidental, special, consequential or punitive damages resulting from your use or inability to use the service.
-                </Text>
-              </View>
-
-              <View style={styles.termsSection}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>7</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>Changes to Terms</Text>
-                </View>
-                <Text style={styles.termsText}>
-                  We reserve the right to modify these terms at any time. Continued use of the service after changes constitutes acceptance of the new terms.
-                </Text>
-              </View>
-
-              <View style={[styles.termsSection, { marginBottom: 0 }]}>
-                <View style={styles.termsSectionHeader}>
-                  <View style={styles.termsSectionNumber}>
-                    <Text style={styles.termsSectionNumberText}>8</Text>
-                  </View>
-                  <Text style={styles.termsHeading}>Contact Information</Text>
-                </View>
-                <Text style={styles.termsText}>
-                  For questions about these Terms & Conditions, please contact our support team at support@lune-health.com
+                <Text style={styles.termsFooterText}>
+                  © 2025 Lune. All rights reserved.
                 </Text>
               </View>
             </ScrollView>
 
-            <View style={styles.modernModalFooter}>
+            <View style={[styles.slideUpModalFooter, { paddingBottom: insets.bottom || 20 }]}>
               <TouchableOpacity
-                style={styles.modernFullWidthButton}
+                style={styles.slideUpModalSaveButton}
                 onPress={() => setShowTermsModal(false)}
-                activeOpacity={0.9}
+                activeOpacity={0.8}
               >
                 <LinearGradient
                   colors={[COLORS.blue, COLORS.deepBlue]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={styles.modernFullWidthButtonGradient}
+                  style={styles.slideUpModalSaveGradient}
                 >
-                  <Ionicons name="checkmark-done" size={20} color={COLORS.white} style={{ marginRight: 8 }} />
-                  <Text style={styles.modernFullWidthButtonText}>I Understand</Text>
+                  <Text style={styles.slideUpModalSaveText}>I Understand</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1341,7 +1439,7 @@ export default function ProfileScreen() {
   );
 }
 
-// Editable Field Component
+// Component Definitions
 function EditableField({
   label,
   value,
@@ -1378,7 +1476,6 @@ function EditableField({
   );
 }
 
-// Settings Item Component
 function SettingsItem({
   icon,
   label,
@@ -1407,7 +1504,6 @@ function SettingsItem({
   );
 }
 
-// Modern Toggle Item Component
 function ModernToggleItem({
   icon,
   label,
@@ -1423,25 +1519,27 @@ function ModernToggleItem({
 }) {
   return (
     <View style={styles.modernToggleItem}>
-      <View style={styles.modernToggleIconContainer}>
-        <Ionicons name={icon} size={20} color={COLORS.blue} />
-      </View>
-      <View style={styles.modernToggleTextContainer}>
-        <Text style={styles.modernToggleLabel}>{label}</Text>
-        <Text style={styles.modernToggleDescription}>{description}</Text>
+      <View style={styles.modernToggleLeft}>
+        <View style={styles.modernToggleIconContainer}>
+          <Ionicons name={icon} size={20} color={value ? COLORS.blue : COLORS.gray} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.modernToggleLabel}>{label}</Text>
+          <Text style={styles.modernToggleDescription}>{description}</Text>
+        </View>
       </View>
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: COLORS.gray + '30', true: COLORS.blue + '50' }}
+        trackColor={{ false: COLORS.gray + '40', true: COLORS.blue + '40' }}
         thumbColor={value ? COLORS.blue : COLORS.white}
-        ios_backgroundColor={COLORS.gray + '30'}
-        style={{ transform: [{ scale: 0.9 }] }}
+        ios_backgroundColor={COLORS.gray + '40'}
       />
     </View>
   );
 }
 
+// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1460,72 +1558,70 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   avatarContainer: {
-    position: 'relative',
     marginBottom: 16,
   },
-  avatar: {
+  avatarWrapper: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    borderWidth: 4,
-    borderColor: COLORS.white,
+    overflow: 'hidden',
+  borderWidth: 2,
+  borderColor: COLORS.blue + '20',
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
   avatarGradient: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: COLORS.white,
+    alignItems: 'center',
   },
   avatarText: {
-    fontSize: 36,
-    fontFamily: 'Inter-Bold',
+    fontSize: 40,
+    fontWeight: 'bold',
     color: COLORS.white,
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    width: 120,
-    height: 120,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     borderRadius: 60,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   uploadingText: {
-    marginTop: 8,
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
     color: COLORS.white,
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: '600',
   },
   editIconContainer: {
     position: 'absolute',
-    bottom: 4,
-    right: 4,
+    bottom: 0,
+    right: 0,
     backgroundColor: COLORS.blue,
     width: 36,
     height: 36,
     borderRadius: 18,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 3,
-    borderColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    borderColor: COLORS.background,
   },
   userName: {
-    fontSize: 24,
-    fontFamily: 'Inter-Bold',
+    fontSize: 28,
+    fontWeight: 'bold',
     color: COLORS.charcoal,
     marginBottom: 4,
   },
   userSubtitle: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
     color: COLORS.gray,
   },
   card: {
@@ -1542,12 +1638,7 @@ const styles = StyleSheet.create({
   },
   personalDetailsCard: {
     borderWidth: 2,
-    borderColor: COLORS.blue + '20',
-    shadowColor: COLORS.blue,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 4,
+    borderColor: COLORS.blue + '15',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -1560,40 +1651,35 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 12,
     backgroundColor: COLORS.blue + '15',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   cardTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
+    fontSize: 18,
+    fontWeight: '700',
     color: COLORS.charcoal,
   },
   editButton: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: COLORS.blue + '15',
-    alignItems: 'center',
+    backgroundColor: COLORS.blue + '10',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   saveButton: {
-    backgroundColor: COLORS.blue,
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 12,
+    backgroundColor: COLORS.blue,
     minWidth: 80,
     alignItems: 'center',
-    shadowColor: COLORS.blue,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
   },
   saveButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
     color: COLORS.white,
+    fontSize: 15,
+    fontWeight: '600',
   },
   healthStats: {
     flexDirection: 'row',
@@ -1606,20 +1692,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statValue: {
-    fontSize: 20,
-    fontFamily: 'Inter-Bold',
-    color: COLORS.blue,
-    marginBottom: 4,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.charcoal,
+    marginBottom: 6,
   },
   statLabel: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: COLORS.charcoal,
+    color: COLORS.gray,
+    marginBottom: 4,
   },
   bmiCategory: {
-    fontSize: 10,
-    fontFamily: 'Inter-Medium',
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '600',
   },
   statDivider: {
     width: 1,
@@ -1629,13 +1714,10 @@ const styles = StyleSheet.create({
   fieldContainer: {
     marginBottom: 16,
   },
-  fieldRow: {
-    flexDirection: 'row',
-  },
   fieldLabel: {
     fontSize: 13,
-    fontFamily: 'Inter-SemiBold',
-    color: COLORS.charcoal,
+    fontWeight: '600',
+    color: COLORS.darkGray,
     marginBottom: 8,
   },
   inputRow: {
@@ -1643,51 +1725,83 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.background,
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     height: 50,
     borderWidth: 1,
     borderColor: 'transparent',
   },
   inputRowDisabled: {
-    opacity: 1,
+    backgroundColor: COLORS.gray + '10',
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    fontFamily: 'Inter-Medium',
     fontSize: 15,
     color: COLORS.charcoal,
+  },
+  fieldRow: {
+    flexDirection: 'row',
+  },
+  ageDisplayContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 50,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  ageDisplayText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.charcoal,
+  },
+  agePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 50,
+    borderWidth: 1,
+    borderColor: COLORS.blue + '30',
+  },
+  agePickerButtonText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.charcoal,
+  },
+  agePickerContainer: {
+    paddingVertical: 20,
+    paddingHorizontal: 20,
   },
   genderDisplayContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.blue + '10',
+    backgroundColor: COLORS.background,
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 2,
-    borderColor: COLORS.blue + '30',
+    height: 50,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   genderIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.blue + '15',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
-    shadowColor: COLORS.blue,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
   },
   genderDisplayText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    color: COLORS.blue,
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.charcoal,
   },
   genderSelector: {
     flexDirection: 'row',
@@ -1695,14 +1809,14 @@ const styles = StyleSheet.create({
   },
   genderOption: {
     flex: 1,
-    height: 50,
-    borderRadius: 12,
-    backgroundColor: COLORS.background,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    paddingVertical: 12,
     gap: 6,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: 'transparent',
   },
   genderOptionActive: {
@@ -1711,12 +1825,12 @@ const styles = StyleSheet.create({
   },
   genderOptionText: {
     fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: COLORS.charcoal,
+    fontWeight: '500',
+    color: COLORS.gray,
   },
   genderOptionTextActive: {
     color: COLORS.blue,
-    fontFamily: 'Inter-Bold',
+    fontWeight: '600',
   },
   settingsItem: {
     flexDirection: 'row',
@@ -1729,19 +1843,20 @@ const styles = StyleSheet.create({
   settingsLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   settingsIconContainer: {
     width: 36,
     height: 36,
     borderRadius: 10,
     backgroundColor: COLORS.blue + '15',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
   },
   settingsLabel: {
     fontSize: 15,
-    fontFamily: 'Inter-Medium',
+    fontWeight: '500',
     color: COLORS.charcoal,
   },
   signOutButton: {
@@ -1749,279 +1864,229 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#FF3B30',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
   },
   signOutGradient: {
-    height: 54,
+    paddingVertical: 18,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   signOutText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
     color: COLORS.white,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  // Modern Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   modernModalContainer: {
+    width: screenWidth - 64,
     backgroundColor: COLORS.white,
-    borderRadius: 28,
-    padding: 28,
-    width: '100%',
-    maxWidth: 380,
+    borderRadius: 24,
+    padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.25,
-    shadowRadius: 25,
-    elevation: 15,
   },
   modernModalIconContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   modernModalIconGradient: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
-    shadowColor: COLORS.blue,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    alignItems: 'center',
   },
   modernModalTitle: {
     fontSize: 22,
-    fontFamily: 'Inter-Bold',
+    fontWeight: 'bold',
     color: COLORS.charcoal,
-    marginBottom: 8,
+    marginBottom: 12,
     textAlign: 'center',
   },
   modernModalMessage: {
     fontSize: 15,
-    fontFamily: 'Inter-Regular',
     color: COLORS.gray,
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 28,
-    paddingHorizontal: 8,
+    marginBottom: 24,
   },
   modernModalButtons: {
     flexDirection: 'row',
-    width: '100%',
     gap: 12,
+    width: '100%',
   },
   modernModalButton: {
     flex: 1,
-    height: 52,
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   modernModalButtonSecondary: {
-    backgroundColor: COLORS.background,
-    justifyContent: 'center',
+    backgroundColor: COLORS.gray + '20',
+    paddingVertical: 14,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.gray + '30',
   },
   modernModalButtonPrimary: {
     overflow: 'hidden',
   },
   modernModalButtonGradient: {
-    flex: 1,
-    justifyContent: 'center',
+    paddingVertical: 14,
     alignItems: 'center',
-    shadowColor: COLORS.blue,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   modernModalButtonTextSecondary: {
-    fontSize: 15,
-    fontFamily: 'Inter-Bold',
-    color: COLORS.charcoal,
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.darkGray,
   },
   modernModalButtonTextPrimary: {
-    fontSize: 15,
-    fontFamily: 'Inter-Bold',
+    fontSize: 16,
+    fontWeight: '600',
     color: COLORS.white,
   },
-  // Slide Modal Styles
-  modernSlideModal: {
+  slideUpModal: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    maxHeight: '85%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: screenHeight * 0.85,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 20,
+    shadowRadius: 12,
+    elevation: 10,
   },
-  modalHandle: {
+  slideUpModalHandle: {
     width: 40,
     height: 5,
     backgroundColor: COLORS.gray + '40',
     borderRadius: 3,
     alignSelf: 'center',
     marginTop: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  modernModalHeader: {
+  slideUpModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingBottom: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.gray + '20',
   },
-  modernModalHeaderIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  slideUpModalIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: COLORS.blue + '15',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    alignItems: 'center',
+    marginRight: 12,
   },
-  modernSlideModalTitle: {
+  slideUpModalTitle: {
     fontSize: 20,
-    fontFamily: 'Inter-Bold',
+    fontWeight: 'bold',
     color: COLORS.charcoal,
-    marginBottom: 2,
   },
-  modernSlideModalSubtitle: {
-    fontSize: 13,
-    fontFamily: 'Inter-Regular',
-    color: COLORS.gray,
-  },
-  modernToggleContainer: {
-    paddingHorizontal: 24,
+  slideUpModalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
     paddingTop: 20,
-    maxHeight: 380,
+  },
+  slideUpModalFooter: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray + '20',
+  },
+  slideUpModalSaveButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  slideUpModalSaveGradient: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  slideUpModalSaveText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
   },
   modernToggleItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.gray + '20',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.gray + '15',
+  },
+  modernToggleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 12,
   },
   modernToggleIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
+    backgroundColor: COLORS.background,
     justifyContent: 'center',
-    marginRight: 12,
-    shadowColor: COLORS.blue,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  modernToggleTextContainer: {
-    flex: 1,
+    alignItems: 'center',
     marginRight: 12,
   },
   modernToggleLabel: {
-    fontSize: 15,
-    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+    fontWeight: '600',
     color: COLORS.charcoal,
     marginBottom: 4,
   },
   modernToggleDescription: {
     fontSize: 13,
-    fontFamily: 'Inter-Regular',
     color: COLORS.gray,
     lineHeight: 18,
   },
-  modernModalFooter: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.gray + '20',
-  },
-  modernFullWidthButton: {
-    width: '100%',
-    height: 54,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  modernFullWidthButtonGradient: {
-    flex: 1,
+  dataInfoBox: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: COLORS.blue,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    backgroundColor: COLORS.blue + '10',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    marginBottom: 8,
   },
-  modernFullWidthButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Bold',
-    color: COLORS.white,
-  },
-  // Terms Styles
-  termsScrollContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    maxHeight: 400,
+  dataInfoText: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.darkGray,
+    lineHeight: 20,
+    marginLeft: 12,
   },
   termsSection: {
     marginBottom: 24,
   },
-  termsSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  termsSectionNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.blue + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  termsSectionNumberText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Bold',
-    color: COLORS.blue,
-  },
-  termsHeading: {
+  termsSectionTitle: {
     fontSize: 16,
-    fontFamily: 'Inter-Bold',
+    fontWeight: '700',
     color: COLORS.charcoal,
-    flex: 1,
+    marginBottom: 8,
   },
   termsText: {
     fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: COLORS.darkGray,
+    color: COLORS.gray,
     lineHeight: 22,
-    paddingLeft: 44,
+  },
+  termsFooter: {
+    marginTop: 32,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray + '30',
+  },
+  termsFooterText: {
+    fontSize: 12,
+    color: COLORS.gray,
+    textAlign: 'center',
+    marginBottom: 4,
   },
 });

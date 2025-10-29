@@ -326,7 +326,7 @@ function SaveChatModal({ visible, onClose, onSave, onDiscard, isSaving }: {
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.saveChatModalBtnSecondaryText}>Don't Save</Text>
+              <Text style={styles.saveChatModalBtnSecondaryText}>{'Don\u2019t Save'}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

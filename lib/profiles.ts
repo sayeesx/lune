@@ -1,12 +1,15 @@
 import { supabase } from './supabaseClient';
 
-export type Profile = {
+export interface Profile {
   id: string; // auth.users.id
-  full_name: string | null;
+  created_at: string;
+  updated_at: string;
   email: string | null;
+  full_name: string | null;
   phone: string | null;
   date_of_birth: string | null; // ISO date (YYYY-MM-DD)
   gender: string | null;
+  age: number | null; // ✅ Added field
   profile_picture_url: string | null;
   location: string | null;
   emergency_contact: any | null; // jsonb
@@ -19,27 +22,22 @@ export type Profile = {
   settings: any | null; // jsonb
   role: 'user' | 'admin' | string;
   status: 'active' | 'inactive' | string;
-  created_at: string;
-  updated_at: string;
-};
+}
 
+// ✅ Fetch current user's profile
 export async function getMyProfile() {
   try {
-    // Get the current user's session
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr) throw userErr;
     if (!user) return { data: null, error: null } as const;
 
-    // Simple direct query to get profile
     const { data: profile, error: fetchError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.id)
       .maybeSingle();
 
-    // Handle profile not found
     if (!profile && !fetchError) {
-      // Create new profile
       const { data: newProfile, error: createError } = await supabase
         .from('profiles')
         .insert({
@@ -47,7 +45,7 @@ export async function getMyProfile() {
           email: user.email,
           full_name: user.user_metadata?.full_name || null,
           role: 'user',
-          status: 'active'
+          status: 'active',
         })
         .select()
         .single();
@@ -72,24 +70,25 @@ export async function getMyProfile() {
   }
 }
 
-export async function updateMyProfile(update: Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at' | 'role' | 'status'>>) {
+// ✅ Update profile safely (excluding protected fields)
+export async function updateMyProfile(
+  update: Partial<Omit<Profile, 'id' | 'created_at' | 'updated_at' | 'role' | 'status'>>
+) {
   try {
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
     if (userErr) throw userErr;
     if (!user) throw new Error('Not authenticated');
 
-    // Ensure profile exists before updating
     const { data: existingProfile } = await getMyProfile();
     if (!existingProfile) {
       throw new Error('Profile not found');
     }
 
-    // Update profile
     const { data, error } = await supabase
       .from('profiles')
       .update({
         ...update,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq('id', user.id)
       .select()
@@ -101,10 +100,9 @@ export async function updateMyProfile(update: Partial<Omit<Profile, 'id' | 'crea
     console.error('Profile update error:', error);
     return { data: null, error } as const;
   }
-
 }
 
-// Optional: ensure a profile row exists for the current user (in case the DB trigger failed)
+// ✅ Ensure a profile exists for the current user
 export async function ensureMyProfile() {
   const { data: { user }, error: userErr } = await supabase.auth.getUser();
   if (userErr) throw userErr;
@@ -125,6 +123,7 @@ export async function ensureMyProfile() {
     email: user.email ?? null,
     phone: user.phone ?? null,
     profile_picture_url: user.user_metadata?.avatar_url ?? null,
+    age: null, // ✅ Initialize with null
   };
 
   const { error: insertErr } = await supabase.from('profiles').insert(payload);

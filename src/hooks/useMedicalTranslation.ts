@@ -3,7 +3,7 @@ import { translateMedicalTerm } from '../api/luneApi';
 
 export default function useMedicalTranslation() {
   const [translation, setTranslation] = useState<any | null>(null);
-  const [translationHistory, setTranslationHistory] = useState<Array<any>>([]);
+  const [translationHistory, setTranslationHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 

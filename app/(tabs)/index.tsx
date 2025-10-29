@@ -19,10 +19,17 @@ import {
   View,
 } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
+import Svg, { Polyline } from "react-native-svg"
 import premiumIcon from "../../assets/home-icons/premium.png"
 import profileIcon from "../../assets/home-icons/profile.png"
+import HomeScreenSkeleton from "@/components/HomeScreenSkeleton"
+
 
 const DEFAULT_NAME = "There"
+
+const AnimatedSvg = Animated.createAnimatedComponent(Svg)
+const AnimatedPolyline = Animated.createAnimatedComponent(Polyline)
+
 
 // Healthcare features
 const healthcareFeatures = [
@@ -56,12 +63,63 @@ const healthcareFeatures = [
   },
 ]
 
+
 const recentChats = [
   "Analyze my symptoms",
   "Check medication dosage",
-  "Scan prescription label",
-  "Explain lab results",
 ]
+
+
+// Animated Lightning Icon Component
+const AnimatedLightningIcon = ({ size = 20, color = "#FFFFFF", shouldAnimate }: { size?: number; color?: string; shouldAnimate: boolean }) => {
+  const dashAnim = useRef(new Animated.Value(0)).current
+  const fillAnim = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    if (shouldAnimate) {
+      // Start dash animation automatically
+      Animated.sequence([
+        Animated.timing(dashAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: false,
+        }),
+        Animated.timing(fillAnim, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: false,
+        }),
+      ]).start()
+    }
+  }, [shouldAnimate])
+
+  const strokeDashoffset = dashAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [68, 0],
+  })
+
+  const fillOpacity = fillAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  })
+
+  return (
+    <AnimatedSvg width={size} height={size} viewBox="0 0 24 24">
+      <AnimatedPolyline
+        points="13.18 1.37 13.18 9.64 21.45 9.64 10.82 22.63 10.82 14.36 2.55 14.36 13.18 1.37"
+        fill={color}
+        fillOpacity={fillOpacity}
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeDasharray="68 68"
+        strokeDashoffset={strokeDashoffset}
+      />
+    </AnimatedSvg>
+  )
+}
+
 
 // Memoized feature card component
 const FeatureCard = memo(
@@ -81,12 +139,15 @@ const FeatureCard = memo(
   )
 )
 
+
 FeatureCard.displayName = "FeatureCard"
+
 
 // Animated greeting component
 const AnimatedGreeting = ({ displayName, shouldStartAnimation }: { displayName: string; shouldStartAnimation: boolean }) => {
   const slideAnim = useRef(new Animated.Value(0)).current
   const [hasAnimated, setHasAnimated] = useState(false)
+
 
   useEffect(() => {
     if (shouldStartAnimation && displayName !== DEFAULT_NAME && !hasAnimated) {
@@ -102,10 +163,12 @@ const AnimatedGreeting = ({ displayName, shouldStartAnimation }: { displayName: 
     }
   }, [shouldStartAnimation, displayName, hasAnimated])
 
+
   const translateY = slideAnim.interpolate({
     inputRange: [-1, 0],
     outputRange: [-40, 0],
   })
+
 
   return (
     <View style={styles.greetingRow}>
@@ -120,6 +183,93 @@ const AnimatedGreeting = ({ displayName, shouldStartAnimation }: { displayName: 
   )
 }
 
+
+// Modern Animated Button Component
+const ModernChatButton = ({ onPress }: { onPress: () => void }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current
+  const glowAnim = useRef(new Animated.Value(0)).current
+  const [shouldAnimateSvg, setShouldAnimateSvg] = useState(false)
+
+  useEffect(() => {
+    // Trigger SVG animation after a delay when component mounts
+    const timer = setTimeout(() => {
+      setShouldAnimateSvg(true)
+    }, 800) // Delay to allow scroll to finish
+
+    // Continuous glow pulse animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim, {
+          toValue: 0,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start()
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.96,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 40,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  })
+
+  return (
+    <View style={styles.modernButtonContainer}>
+      {/* Outer glow layers */}
+      <Animated.View style={[styles.glowLayer1, { opacity: glowOpacity }]} />
+      <Animated.View style={[styles.glowLayer2, { opacity: glowOpacity }]} />
+      
+      <Animated.View style={[{ transform: [{ scale: scaleAnim }] }]}>
+        <TouchableOpacity
+          onPress={onPress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          activeOpacity={1}
+        >
+          <LinearGradient 
+            colors={["#2652F9", "#032EA6"]} 
+            style={styles.modernButtonGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <View style={styles.modernButtonContent}>
+              <View style={styles.iconCircle}>
+                <AnimatedLightningIcon size={20} color="#FFFFFF" shouldAnimate={shouldAnimateSvg} />
+              </View>
+              <Text style={styles.modernButtonText}>Chat with Lune AI</Text>
+              <MaterialCommunityIcons name="arrow-right" size={20} color="#FFFFFF" />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
+  )
+}
+
+
 export default function HomeScreen() {
   const insets = useSafeAreaInsets()
   const [displayName, setDisplayName] = useState<string>(DEFAULT_NAME)
@@ -132,37 +282,19 @@ export default function HomeScreen() {
   // Track if initial load has completed to prevent multiple loading animations
   const hasInitiallyLoaded = useRef(false)
   const fadeAnim = useRef(new Animated.Value(0)).current
-  const spinValue = useRef(new Animated.Value(0)).current
   const keyboardHeight = useRef(new Animated.Value(0)).current
+
 
   const handleNotificationsPress = () => {
     setIsNotificationsVisible(true)
   }
 
-  // Spinner animation - only runs during initial loading
-  useEffect(() => {
-    if (isLoading && !hasInitiallyLoaded.current) {
-      const spin = Animated.loop(
-        Animated.timing(spinValue, {
-          toValue: 1,
-          duration: 1000,
-          useNativeDriver: true,
-        })
-      )
-      spin.start()
-      return () => spin.stop()
-    }
-  }, [isLoading])
-
-  const spinInterpolate = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  })
 
   // Keyboard handling
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow"
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide"
+
 
     const keyboardWillShow = Keyboard.addListener(showEvent, (e) => {
       Animated.timing(keyboardHeight, {
@@ -172,6 +304,7 @@ export default function HomeScreen() {
       }).start()
     })
 
+
     const keyboardWillHide = Keyboard.addListener(hideEvent, (e) => {
       Animated.timing(keyboardHeight, {
         toValue: 0,
@@ -180,11 +313,13 @@ export default function HomeScreen() {
       }).start()
     })
 
+
     return () => {
       keyboardWillShow.remove()
       keyboardWillHide.remove()
     }
   }, [keyboardHeight])
+
 
   // Initial authentication and data loading
   useEffect(() => {
@@ -204,8 +339,10 @@ export default function HomeScreen() {
           return
         }
 
+
         // User is authenticated
         setIsAuthenticated(true)
+
 
         // Preload all images
         const imagesToPreload = [
@@ -215,9 +352,11 @@ export default function HomeScreen() {
           ...healthcareFeatures.map(f => f.iconSource),
         ]
 
+
         const imagePromises = imagesToPreload.map((imageSource) =>
           Image.prefetch(Image.resolveAssetSource(imageSource).uri).catch(() => {})
         )
+
 
         // Fetch profile data
         const profilePromise = supabase
@@ -226,11 +365,13 @@ export default function HomeScreen() {
           .eq("id", sessionData.session.user.id)
           .single()
 
+
         // Wait for both images and profile
         const [profileResult] = await Promise.all([
           profilePromise,
           ...imagePromises,
         ])
+
 
         const { data: profile, error: profileError } = profileResult
         
@@ -261,6 +402,7 @@ export default function HomeScreen() {
             }
           }
 
+
           // Show content after everything is loaded
           setIsLoading(false)
           hasInitiallyLoaded.current = true
@@ -286,6 +428,7 @@ export default function HomeScreen() {
       }
     }
 
+
     // Only load if this is the first time
     if (!hasInitiallyLoaded.current) {
       loadData()
@@ -295,6 +438,7 @@ export default function HomeScreen() {
       isMounted = false
     }
   }, [])
+
 
   // Handle smooth animations when returning to this screen
   useFocusEffect(
@@ -308,6 +452,7 @@ export default function HomeScreen() {
         }).start()
       }
 
+
       // Reset fade for next unfocus
       return () => {
         if (hasInitiallyLoaded.current) {
@@ -316,6 +461,7 @@ export default function HomeScreen() {
       }
     }, [])
   )
+
 
   const handleSendMessage = useCallback((text: string) => {
     if (text.trim()) {
@@ -326,6 +472,7 @@ export default function HomeScreen() {
     }
   }, [])
 
+
   const handleChatHistoryPress = useCallback((chatText: string) => {
     router.push({
       pathname: "/(tabs)/chat",
@@ -333,54 +480,50 @@ export default function HomeScreen() {
     })
   }, [])
 
+
   const handlePremiumPress = useCallback(() => {
     router.push("/(features)/premium")
   }, [])
+
 
   const handleProfilePress = useCallback(() => {
     router.push("/(tabs)/profile")
   }, [])
 
-  const handleSeeAllPress = useCallback(() => {
-    router.push("/(tabs)/chat")
-  }, [])
 
   const handleFeaturePress = useCallback((route: string) => {
     router.push(route as any)
   }, [])
 
+
   // Redirect to auth if not authenticated.
-  // Use an effect + router.replace so navigation happens outside render
-  // and we replace history (prevents going back to protected screens).
   useEffect(() => {
     if (!isLoading && isAuthenticated === false) {
       router.replace('/auth/login')
     }
   }, [isLoading, isAuthenticated])
 
+
   if (!isLoading && isAuthenticated === false) {
-    // While router.replace runs, render nothing from this screen.
     return null
   }
 
-  // Loading screen - only shown on initial load
+
+  // Loading screen with shimmer skeleton
   if (isLoading && !hasInitiallyLoaded.current) {
     return (
-      <View style={styles.loadingContainer}>
+      <>
         <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
-        <Animated.View style={[styles.spinnerContainer, { transform: [{ rotate: spinInterpolate }] }]}>
-          <View style={styles.spinner}>
-            <View style={styles.spinnerInner} />
-          </View>
-        </Animated.View>
-        <Text style={styles.loadingText}>Loading Lune...</Text>
-      </View>
+        <HomeScreenSkeleton />
+      </>
     )
   }
+
 
   return (
     <Animated.View style={[styles.outerContainer, { opacity: fadeAnim }]}>
       <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+
 
       <ScrollView
         style={styles.scrollContainer}
@@ -426,16 +569,19 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
+
           <NotificationModal
             isVisible={isNotificationsVisible}
             onClose={() => setIsNotificationsVisible(false)}
           />
+
 
           <View style={styles.greetingSection}>
             <AnimatedGreeting displayName={displayName} shouldStartAnimation={shouldStartAnimation} />
             <Text style={styles.tagline}>Lune, An AI That Understands Your Health..</Text>
           </View>
         </View>
+
 
         {/* Feature Cards Grid */}
         <View style={styles.featuresSection}>
@@ -450,13 +596,16 @@ export default function HomeScreen() {
           </View>
         </View>
 
+
         {/* Ask Lune AI Section */}
         <View style={styles.chatHistorySection}>
           <View style={styles.chatHistoryHeader}>
             <Text style={styles.chatHistoryTitle}>Ask Lune AI</Text>
           </View>
-          <View style={styles.chatPills}>
-            {recentChats.slice(0, 2).map((chat, index) => (
+          
+          {/* Two suggestions in a single row */}
+          <View style={styles.chatPillsRow}>
+            {recentChats.map((chat, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.chatPill}
@@ -468,68 +617,19 @@ export default function HomeScreen() {
             ))}
           </View>
           
-          {/* Chat with Lune AI Premium Button */}
-          <TouchableOpacity
-            onPress={() => router.push("/(tabs)/chat")}
-            activeOpacity={0.8}
-            style={styles.chatPremiumButton}
-          >
-            <LinearGradient 
-              colors={["#2652F9", "#032EA6"]} 
-              style={styles.chatPremiumGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <View style={styles.chatPremiumContent}>
-                <MaterialCommunityIcons name="robot" size={24} color="#FFFFFF" />
-                <Text style={styles.chatPremiumText}>Chat with Lune AI</Text>
-                <MaterialCommunityIcons name="chevron-right" size={24} color="#FFFFFF" />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
+          {/* Modern Chat Button - ONLY ONE */}
+          <ModernChatButton onPress={() => router.push("/(tabs)/chat")} />
         </View>
-
-        {/* Bottom spacing */}
-        <View style={{ height: 40 }} />
       </ScrollView>
     </Animated.View>
   )
 }
 
+
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window")
 
+
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  spinnerContainer: {
-    marginBottom: 20,
-  },
-  spinner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 4,
-    borderColor: "#E8EAEE",
-    borderTopColor: "#2652F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  spinnerInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F5F6FA",
-  },
-  loadingText: {
-    fontSize: 16,
-    fontFamily: "Inter-Medium",
-    color: "#9199B1",
-    marginTop: 16,
-  },
   notificationButton: {
     width: 40,
     height: 40,
@@ -564,7 +664,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   scrollContentContainer: {
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   header: {
     backgroundColor: "#FFFFFF",
@@ -692,7 +792,6 @@ const styles = StyleSheet.create({
   },
   chatHistorySection: {
     paddingHorizontal: screenWidth * 0.06,
-    marginBottom: screenHeight * 0.02,
   },
   chatHistoryHeader: {
     flexDirection: "row",
@@ -705,50 +804,112 @@ const styles = StyleSheet.create({
     fontFamily: "Inter-SemiBold",
     color: "#100F15",
   },
-  seeAllText: {
-    fontSize: screenWidth * 0.035,
-    fontFamily: "Inter-Medium",
-    color: "#2652F9",
-  },
-  chatPills: {
+  chatPillsRow: {
     flexDirection: "row",
     gap: 12,
-    flexWrap: "wrap",
+    marginBottom: 20,
   },
   chatPill: {
+    flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 20,
-    marginBottom: 8,
     borderWidth: 1,
     borderColor: "#E8EAEE",
+    alignItems: "center",
+    justifyContent: "center",
   },
   chatPillText: {
-    fontSize: screenWidth * 0.035,
+    fontSize: screenWidth * 0.033,
     fontFamily: "Inter-Medium",
     color: "#4A4A4D",
+    textAlign: "center",
+    lineHeight: 18,
   },
-  chatPremiumButton: {
-    marginTop: 20,
-    borderRadius: 16,
-    overflow: "hidden",
+  // Modern button styles
+  modernButtonContainer: {
+    position: "relative",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 52,
   },
-  chatPremiumGradient: {
+  glowLayer1: {
+    position: "absolute",
     width: "100%",
-    paddingVertical: 16,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#2652F9",
+    zIndex: -2,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#2652F9",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.4,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 10,
+      },
+    }),
   },
-  chatPremiumContent: {
+  glowLayer2: {
+    position: "absolute",
+    width: "92%",
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#032EA6",
+    zIndex: -1,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#032EA6",
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  modernButtonGradient: {
+    width: screenWidth * 0.88,
+    paddingVertical: 14,
+    borderRadius: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.15,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  modernButtonContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
-  chatPremiumText: {
+  iconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.2)",
+  },
+  modernButtonText: {
     flex: 1,
-    fontSize: screenWidth * 0.045,
-    fontFamily: "Inter-SemiBold",
+    fontSize: screenWidth * 0.04,
+    fontFamily: "Inter-Bold",
     color: "#FFFFFF",
-    marginLeft: 12,
+    marginLeft: 10,
+    letterSpacing: 0.2,
   },
 })
