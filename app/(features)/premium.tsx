@@ -70,7 +70,7 @@ export default function PremiumScreen() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton} 
-          onPress={() => router.back()}
+          onPress={() => router.replace("/(features)/ai-doctor")}
           accessibilityLabel="Go back"
         >
           <MaterialCommunityIcons name="chevron-left" size={28} color="#FFFFFF" />
