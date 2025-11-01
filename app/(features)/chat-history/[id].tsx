@@ -25,7 +25,8 @@ import * as Haptics from "expo-haptics";
 import Toast from "react-native-toast-message";
 import { LinearGradient } from "expo-linear-gradient";
 import { supabase } from "../../../lib/supabaseClient";
-import useDoctor, { Message } from "../../../src/hooks/useDoctor";
+// Removed: useDoctor hook import to route via backend API
+// import useDoctor, { Message } from "../../../src/hooks/useDoctor";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -39,9 +40,9 @@ const HEADER_TOP_OFFSET = Platform.OS === "ios" ? 36 : 40;
 const LIST_TOP_INSET = HEADER_TOP_OFFSET + CONTROL_HEIGHT + 16;
 
 // Page and bubble gradients (match AIDoctor)
-const PAGE_GRADIENT = ["#e3eaff", "#ffffff"]; // top -> bottom
-const USER_GRADIENT = ["#032EA6", "#2652F9"]; // darker for sent/user
-const BOT_GRADIENT = ["rgba(3,46,166,0.06)", "rgba(38,82,249,0.10)"]; // lighter for response
+const PAGE_GRADIENT = ["#e3eaff", "#ffffff"] as const; // top -> bottom
+const USER_GRADIENT = ["#032EA6", "#2652F9"] as const; // darker for sent/user
+const BOT_GRADIENT = ["rgba(3,46,166,0.06)", "rgba(38,82,249,0.10)"] as const; // lighter for response
 
 const COLORS = {
   white: "#FFFFFF",
@@ -54,6 +55,18 @@ const COLORS = {
   background: "#F8F9FC",
   border: "#E5E7EB",
 };
+
+// Local message type (mirrors AIDoctor)
+type Message = {
+  id: string;
+  role: "user" | "doctor" | "error";
+  content: string;
+  timestamp: string;
+};
+
+// Build API base from Expo public env
+const API_BASE = (process.env.EXPO_PUBLIC_RENDER_API_URL ?? "").replace(/\/$/, "");
+const DOCTOR_URL = API_BASE ? `${API_BASE}/api/doctor` : null;
 
 // Send button loader (same as AIDoctor)
 const LoadingDots = () => {
@@ -142,7 +155,7 @@ function ChatHistoryModal({
       const { data, error } = await supabase.from("chat_history").select("*").order("updated_at", { ascending: false });
       if (error) throw error;
       setChatHistory(data || []);
-    } catch (e) {
+    } catch {
       Toast.show({ type: "error", text1: "Error", text2: "Failed to load chat history", position: "top", topOffset: 60 });
     } finally {
       setLoading(false);
@@ -242,8 +255,8 @@ function AnimatedMessageBubble({ text, isUser, isError }: { text: string; isUser
 }
 
 export default function ChatHistoryDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { sendMessage } = useDoctor();
+  const { id } = useLocalSearchParams<{ id: string }>(); // chat_id from route param [web:42]
+  // Removed: const { sendMessage } = useDoctor();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -258,6 +271,7 @@ export default function ChatHistoryDetail() {
   const typingRafRef = useRef<number | null>(null);
   const messageIdCounterRef = useRef(0);
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const generateUniqueId = useCallback((role: string) => {
     const timestamp = Date.now();
@@ -298,23 +312,24 @@ export default function ChatHistoryDetail() {
     [generateUniqueId, scrollToBottom]
   );
 
+  // Load full conversation from Supabase by chat_id (ordered oldest->newest)
   const loadConversation = useCallback(async () => {
     try {
       const { data: rows, error } = await supabase
         .from("chat_messages")
         .select("role, content, timestamp")
         .eq("chat_id", id)
-        .order("timestamp", { ascending: true });
+        .order("timestamp", { ascending: true }); // natural chat flow [web:56][web:57][web:49]
       if (error) throw error;
       const mapped: Message[] = (rows || []).map((r, idx) => ({
         id: `loaded-${idx}-${Date.now()}`,
-        role: r.role,
-        content: r.content,
-        timestamp: r.timestamp,
-      })) as Message[];
+        role: r.role as Message["role"],
+        content: r.content as string,
+        timestamp: r.timestamp as string,
+      }));
       setMessages(mapped);
       scrollToBottom(false);
-    } catch (e) {
+    } catch {
       Toast.show({ type: "error", text1: "Error", text2: "Failed to load conversation", position: "top", topOffset: 60 });
     }
   }, [id, scrollToBottom]);
@@ -324,18 +339,19 @@ export default function ChatHistoryDetail() {
     return () => {
       stopAutoScroll();
       if (typingRafRef.current) cancelAnimationFrame(typingRafRef.current);
+      if (fetchAbortRef.current) {
+        try {
+          fetchAbortRef.current.abort();
+        } catch {}
+      }
     };
-  }, [loadConversation]);
+  }, [loadConversation, stopAutoScroll]);
 
-  const persistAssistant = async (finalText: string) => {
+  // Persist is now server-side; this client helper is not inserting to avoid duplicates
+  const afterAssistantFinished = async () => {
     try {
-      await supabase.from("chat_messages").insert({
-        chat_id: id,
-        role: "doctor",
-        content: finalText,
-        timestamp: new Date().toISOString(),
-      });
-      await supabase.from("chat_history").update({ last_message: finalText, updated_at: new Date().toISOString() }).eq("id", id);
+      // Optionally refresh from server to reflect authoritative state
+      await loadConversation();
     } catch {}
   };
 
@@ -373,11 +389,11 @@ export default function ChatHistoryDetail() {
         });
 
         if (idx >= text.length) {
-          await persistAssistant(text);
           typingMessageIdRef.current = null;
           setIsTyping(false);
           stopAutoScroll();
           scrollToBottom(true);
+          await afterAssistantFinished();
           resolve();
           return;
         }
@@ -393,12 +409,34 @@ export default function ChatHistoryDetail() {
       cancelAnimationFrame(typingRafRef.current);
       typingRafRef.current = null;
     }
-    const last = [...messages].reverse().find((m) => m.role === "doctor");
-    if (last) await persistAssistant(last.content);
     typingMessageIdRef.current = null;
     setIsTyping(false);
     stopAutoScroll();
+    if (fetchAbortRef.current) {
+      try {
+        fetchAbortRef.current.abort();
+      } catch {}
+      fetchAbortRef.current = null;
+    }
   };
+
+  // Backend call to Render /api/doctor
+  const callDoctorAPI = useCallback(async (message: string, chatId: string, signal?: AbortSignal) => {
+    if (!DOCTOR_URL) {
+      throw new Error("Missing EXPO_PUBLIC_RENDER_API_URL; set it to your Render base URL");
+    }
+    const res = await fetch(DOCTOR_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, chat_id: chatId }),
+      signal,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<{ success: boolean; reply?: string; error?: string }>;
+  }, []);
 
   const handleSend = async () => {
     const content = input.trim();
@@ -407,30 +445,60 @@ export default function ChatHistoryDetail() {
     setIsSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
+    // Local optimistic echo for UX only; server persists the message
     const userMsg: Message = { id: generateUniqueId("user"), role: "user", content, timestamp: new Date().toISOString() };
     appendMessage(userMsg);
     setInput("");
 
-    try {
-      await supabase.from("chat_messages").insert({ chat_id: id, role: "user", content, timestamp: new Date().toISOString() });
-    } catch {}
+    // Thinking bubble (temporary)
+    const thinkingId = generateUniqueId("doctor");
+    appendMessage({
+      id: thinkingId,
+      role: "doctor",
+      content: "Dr. Lune is thinking…",
+      timestamp: new Date().toISOString(),
+    });
 
-    const history = messages.filter((m) => m.role === "user" || m.role === "doctor").map((m) => ({ role: m.role, content: m.content }));
-
     try {
-      const res = await sendMessage(content, history);
+      const controller = new AbortController();
+      fetchAbortRef.current = controller;
+      const data = await callDoctorAPI(content, String(id), controller.signal);
+      fetchAbortRef.current = null;
       setIsSending(false);
-      if (!res || !res.success) {
-        appendMessage({ id: generateUniqueId("error"), role: "error", content: res?.error || "Failed to get response", timestamp: new Date().toISOString() } as Message);
+
+      // Remove thinking bubble
+      setMessages((m) => m.filter((x) => x.id !== thinkingId));
+
+      if (!data || !data.success || !data.reply) {
+        appendMessage({
+          id: generateUniqueId("error"),
+          role: "error",
+          content: data?.error || "Failed to get response",
+          timestamp: new Date().toISOString(),
+        });
+        Toast.show({ type: "error", text1: "Error", text2: data?.error || "Failed to get response", position: "top", topOffset: 60 });
         return;
       }
-      const aiRaw = (res.data && (res.data as any).reply) || res.data || "No response.";
-      const aiText = typeof aiRaw === "string" ? aiRaw : JSON.stringify(aiRaw);
-      await smoothStreamAI(aiText);
-    } catch (e) {
+      await smoothStreamAI(String(data.reply));
+    } catch (e: any) {
       setIsTyping(false);
       setIsSending(false);
-      appendMessage({ id: generateUniqueId("error"), role: "error", content: "An unexpected error occurred", timestamp: new Date().toISOString() } as Message);
+      if (fetchAbortRef.current) {
+        try {
+          fetchAbortRef.current.abort();
+        } catch {}
+        fetchAbortRef.current = null;
+      }
+      setMessages((m) => m.filter((x) => x.id !== thinkingId));
+      appendMessage({
+        id: generateUniqueId("error"),
+        role: "error",
+        content: e?.name === "AbortError" ? "Generation stopped" : e?.message || "An unexpected error occurred",
+        timestamp: new Date().toISOString(),
+      });
+      if (e?.name !== "AbortError") {
+        Toast.show({ type: "error", text1: "Error", text2: e?.message || "An unexpected error occurred", position: "top", topOffset: 60 });
+      }
     }
   };
 
@@ -672,6 +740,7 @@ const styles = StyleSheet.create({
   botBubble: { alignSelf: "flex-start" },
   userBubble: { alignSelf: "flex-end", minHeight: CONTROL_HEIGHT },
   errorBubble: { backgroundColor: "#FEE2E2", borderColor: "#FCA5A5", borderWidth: 1, borderRadius: CONTROL_RADIUS },
+
   bubbleText: { fontSize: 14, lineHeight: 20, letterSpacing: 0.1, fontFamily: "Inter-Regular" },
   botText: { color: COLORS.charcoal },
   userText: { color: COLORS.white },

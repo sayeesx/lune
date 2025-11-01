@@ -3,6 +3,7 @@ import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
+import * as Crypto from "expo-crypto";
 import { StatusBar } from "expo-status-bar";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,24 +26,33 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type DimensionValue,
+  type ViewStyle,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import useDoctor, { Message } from "../../src/hooks/useDoctor";
+
+// Local message type
+type Message = {
+  id: string;
+  role: "user" | "doctor" | "error";
+  content: string;
+  timestamp: string;
+};
 
 const { width: screenWidth } = Dimensions.get("window");
 
-// Unified sizing across controls
-const CONTROL_HEIGHT = 48; // input, send/stop button, back/history pill, sent bubble
+// Unified sizing across controls (unchanged)
+const CONTROL_HEIGHT = 48;
 const CONTROL_RADIUS = CONTROL_HEIGHT / 2;
 
-// Header placement
+// Header placement (unchanged)
 const HEADER_TOP_OFFSET = Platform.OS === "ios" ? 36 : 40;
 const LIST_TOP_INSET = HEADER_TOP_OFFSET + CONTROL_HEIGHT + 16;
 
-// Gradients
-const PAGE_GRADIENT = ["#e3eaff", "#ffffff"]; // top -> bottom
-const USER_GRADIENT = ["#032EA6", "#2652F9"]; // darker for sent/user
-const BOT_GRADIENT = ["rgba(3,46,166,0.06)", "rgba(38,82,249,0.10)"]; // lighter for response
+// Gradients (unchanged)
+const PAGE_GRADIENT = ["#e3eaff", "#ffffff"] as const;
+const USER_GRADIENT = ["#032EA6", "#2652F9"] as const;
+const BOT_GRADIENT = ["rgba(3,46,166,0.06)", "rgba(38,82,249,0.10)"] as const;
 
 const COLORS = {
   white: "#FFFFFF",
@@ -56,6 +66,11 @@ const COLORS = {
   border: "#E5E7EB",
 };
 
+// SplitTextAnimated, ShimmerBlock, LoadingDots, ShimmerRow, SaveChatModal, ChatHistoryModal,
+// WelcomeScreen, AnimatedMessageBubble components remain the same as your current file
+// to preserve layout/theme and are included below unchanged.
+
+// SplitTextAnimated (unchanged)
 interface SplitTextAnimatedProps {
   text: string;
   delay?: number;
@@ -85,7 +100,7 @@ const SplitTextAnimated: React.FC<SplitTextAnimatedProps> = ({ text, delay = 50,
   );
 };
 
-// Generic shimmer block
+// ShimmerBlock (unchanged)
 const ShimmerBlock = ({ width, height, borderRadius = 8 }: { width: number | string; height: number; borderRadius?: number }) => {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -94,8 +109,16 @@ const ShimmerBlock = ({ width, height, borderRadius = 8 }: { width: number | str
     return () => loop.stop();
   }, []);
   const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [-150, 150] });
+  const viewStyle: ViewStyle = {
+    width: width as DimensionValue,
+    height,
+    borderRadius,
+    overflow: 'hidden',
+    backgroundColor: "#ECEFF3"
+  };
+  
   return (
-    <View style={{ width, height, borderRadius, overflow: "hidden", backgroundColor: "#ECEFF3" }}>
+    <View style={viewStyle}>
       <Animated.View
         style={{
           position: "absolute",
@@ -110,7 +133,7 @@ const ShimmerBlock = ({ width, height, borderRadius = 8 }: { width: number | str
   );
 };
 
-// Loading dots (used for send state only)
+// LoadingDots (unchanged)
 const LoadingDots = () => {
   const dot1 = useRef(new Animated.Value(0)).current;
   const dot2 = useRef(new Animated.Value(0)).current;
@@ -159,7 +182,7 @@ interface ChatHistory {
   updated_at: string;
 }
 
-// Shimmer skeleton row (chat history)
+// ShimmerRow (unchanged)
 const ShimmerRow = () => {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -177,7 +200,7 @@ const ShimmerRow = () => {
   );
 };
 
-// Themed Save/Don’t Save modal with per-button spinner
+// SaveChatModal (unchanged visual)
 function SaveChatModal({
   visible,
   onClose,
@@ -218,29 +241,11 @@ function SaveChatModal({
                 Would you like to save this chat for later so you can access it from your chat history?
               </Text>
               <View style={styles.saveChatModalButtons}>
-                <TouchableOpacity
-                  style={styles.saveChatModalBtnSecondary}
-                  onPress={onDiscard}
-                  activeOpacity={0.8}
-                  disabled={disabled}
-                >
-                  {savingAction === "discard" ? (
-                    <ActivityIndicator color={COLORS.blue} />
-                  ) : (
-                    <Text style={styles.saveChatModalBtnSecondaryText}>Don’t Save</Text>
-                  )}
+                <TouchableOpacity style={styles.saveChatModalBtnSecondary} onPress={onDiscard} activeOpacity={0.8} disabled={disabled}>
+                  {savingAction === "discard" ? <ActivityIndicator color={COLORS.blue} /> : <Text style={styles.saveChatModalBtnSecondaryText}>Don’t Save</Text>}
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.saveChatModalBtnPrimary}
-                  onPress={onSave}
-                  activeOpacity={0.8}
-                  disabled={disabled}
-                >
-                  {savingAction === "save" ? (
-                    <ActivityIndicator color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.saveChatModalBtnPrimaryText}>Save Chat</Text>
-                  )}
+                <TouchableOpacity style={styles.saveChatModalBtnPrimary} onPress={onSave} activeOpacity={0.8} disabled={disabled}>
+                  {savingAction === "save" ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.saveChatModalBtnPrimaryText}>Save Chat</Text>}
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -251,6 +256,7 @@ function SaveChatModal({
   );
 }
 
+// ChatHistoryModal (unchanged visual)
 function ChatHistoryModal({
   visible,
   onClose,
@@ -343,6 +349,7 @@ function ChatHistoryModal({
   );
 }
 
+// WelcomeScreen (unchanged)
 function WelcomeScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
@@ -407,7 +414,7 @@ function WelcomeScreen() {
   );
 }
 
-// Gradient chat bubbles
+// Message bubble (unchanged)
 function AnimatedMessageBubble({ text, isUser, isError }: { text: string; isUser?: boolean; isError?: boolean }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(10)).current;
@@ -442,8 +449,11 @@ function AnimatedMessageBubble({ text, isUser, isError }: { text: string; isUser
   );
 }
 
+// API base (unchanged)
+const API_BASE = (process.env.EXPO_PUBLIC_RENDER_API_URL ?? "").replace(/\/$/, "");
+const DOCTOR_URL = API_BASE ? `${API_BASE}/api/doctor` : null;
+
 export default function AIDoctorScreen() {
-  const { sendMessage } = useDoctor();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -462,11 +472,23 @@ export default function AIDoctorScreen() {
   const messageIdCounterRef = useRef(0);
   const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const generateUniqueId = useCallback((role: string) => {
-    const timestamp = Date.now();
+  // chat/session state
+  const [chatId, setChatId] = useState<string | null>(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
+  const pendingBotIdRef = useRef<string | null>(null);
+
+  const generateLocalId = useCallback((role: string) => {
+    const ts = Date.now();
     const counter = messageIdCounterRef.current++;
-    const randomId = Math.random().toString(36).slice(2, 9);
-    return `${role}-${timestamp}-${counter}-${randomId}`;
+    const rand = Math.random().toString(36).slice(2, 9);
+    return `${role}-${ts}-${counter}-${rand}`;
+  }, []);
+
+  // NEW: always create a fresh UUID v4 chat_id when opening new chat
+  useEffect(() => {
+    const newId = Crypto.randomUUID();
+    setChatId(newId);
+    AsyncStorage.setItem("lune:aidoctor:chat_id", newId).catch(() => {});
   }, []);
 
   const scrollToBottom = useCallback((animated: boolean = true) => {
@@ -496,15 +518,20 @@ export default function AIDoctorScreen() {
     (msg: Message) => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setMessages((m) => {
-        if (m.some((existing) => existing.id === msg.id)) msg.id = generateUniqueId(msg.role);
+        if (m.some((existing) => existing.id === msg.id)) msg.id = generateLocalId(msg.role);
         return [...m, msg];
       });
       if (msg.role === "doctor") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       scrollToBottom(true);
     },
-    [generateUniqueId, scrollToBottom]
+    [generateLocalId, scrollToBottom]
   );
 
+  const removeMessageById = useCallback((id: string) => {
+    setMessages((m) => m.filter((x) => x.id !== id));
+  }, []);
+
+  // Save chat metadata only; messages are already saved by backend per send
   const saveChatToDatabase = async () => {
     const {
       data: { user },
@@ -513,29 +540,22 @@ export default function AIDoctorScreen() {
       Toast.show({ type: "error", text1: "Error", text2: "You must be logged in to save chats", position: "top", topOffset: 60 });
       return;
     }
+    if (!chatId) {
+      Toast.show({ type: "error", text1: "Error", text2: "Chat not ready, try again", position: "top", topOffset: 60 });
+      return;
+    }
     const firstUserMessage = messages.find((m) => m.role === "user")?.content || "New Chat";
     const lastMessage = messages[messages.length - 1]?.content || "";
-    const { data: chatData, error: chatError } = await supabase
-      .from("chat_history")
-      .insert({
-        user_id: user.id,
-        title: firstUserMessage.substring(0, 50),
-        last_message: lastMessage.substring(0, 200),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select("id")
-      .single();
-    if (chatError) throw chatError;
-    const messageInserts = messages.map((msg) => ({
-      chat_id: chatData.id,
-      role: msg.role,
-      content: msg.content,
-      timestamp: new Date().toISOString(),
-    }));
-    const { error: messagesError } = await supabase.from("chat_messages").insert(messageInserts);
-    if (messagesError) throw messagesError;
-    Toast.show({ type: "success", text1: "Chat Saved", text2: "Your conversation has been saved", position: "top", topOffset: 60 });
+    const { error } = await supabase.from("chat_history").insert({
+      id: chatId, // critical: persist the same chat_id here
+      user_id: user.id,
+      title: firstUserMessage.substring(0, 50),
+      last_message: lastMessage.substring(0, 200),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    if (error) throw error;
+    Toast.show({ type: "success", text1: "Chat Saved", text2: "Conversation saved to history", position: "top", topOffset: 60 });
     await AsyncStorage.removeItem(STORAGE_KEY);
     router.replace("/(tabs)");
   };
@@ -555,6 +575,7 @@ export default function AIDoctorScreen() {
     setSavingAction("discard");
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
+      await AsyncStorage.removeItem("lune:aidoctor:chat_id");
       router.replace("/(tabs)");
     } catch (e: any) {
       Toast.show({ type: "error", text1: "Error", text2: e?.message || "Failed to discard chat", position: "top", topOffset: 60 });
@@ -575,7 +596,7 @@ export default function AIDoctorScreen() {
       setSavingAction(null);
       setShowSaveModal(false);
     }
-  }, [savingAction, messages]);
+  }, [savingAction, messages, chatId]);
 
   const stopStreaming = () => {
     if (typingRafRef.current) {
@@ -585,12 +606,23 @@ export default function AIDoctorScreen() {
     typingMessageIdRef.current = null;
     setIsTyping(false);
     stopAutoScroll();
+
+    if (fetchAbortRef.current) {
+      try {
+        fetchAbortRef.current.abort();
+      } catch {}
+      fetchAbortRef.current = null;
+    }
+    if (pendingBotIdRef.current) {
+      removeMessageById(pendingBotIdRef.current);
+      pendingBotIdRef.current = null;
+    }
   };
 
-  // Smooth streaming
+  // Smooth streaming (unchanged UI)
   const smoothStreamAI = (text: string) =>
     new Promise<void>((resolve) => {
-      const id = generateUniqueId("bot");
+      const id = generateLocalId("bot");
       typingMessageIdRef.current = id;
       setIsTyping(true);
       let idx = 0;
@@ -635,35 +667,84 @@ export default function AIDoctorScreen() {
       typingRafRef.current = requestAnimationFrame(frame);
     });
 
+  // Backend call
+  const callDoctorAPI = useCallback(async (message: string, cid: string, signal?: AbortSignal) => {
+    if (!DOCTOR_URL) {
+      throw new Error("Missing EXPO_PUBLIC_RENDER_API_URL; set it to your Render base URL");
+    }
+    const res = await fetch(DOCTOR_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, chat_id: cid }),
+      signal,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(text || `HTTP ${res.status}`);
+    }
+    return res.json() as Promise<{ success: boolean; reply?: string; error?: string }>;
+  }, []);
+
   const handleSend = async (text?: string) => {
     const content = (text ?? input).trim();
     if (!content || isSending || isTyping) return;
+    if (!chatId) {
+      Toast.show({ type: "error", text1: "Error", text2: "Chat not ready, please try again.", position: "top", topOffset: 60 });
+      return;
+    }
 
     setIsSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    const userMsg: Message = { id: generateUniqueId("user"), role: "user", content, timestamp: new Date().toISOString() };
+    const userMsg: Message = { id: generateLocalId("user"), role: "user", content, timestamp: new Date().toISOString() };
     appendMessage(userMsg);
     setInput("");
 
-    const history = messages.filter((m) => m.role === "user" || m.role === "doctor").map((m) => ({ role: m.role, content: m.content }));
+    const thinkingId = generateLocalId("doctor");
+    pendingBotIdRef.current = thinkingId;
+    appendMessage({ id: thinkingId, role: "doctor", content: "Dr. Lune is thinking…", timestamp: new Date().toISOString() });
 
     try {
-      const res = await sendMessage(content, history);
+      const controller = new AbortController();
+      fetchAbortRef.current = controller;
+      const data = await callDoctorAPI(content, chatId, controller.signal);
+      fetchAbortRef.current = null;
       setIsSending(false);
-      if (!res || !res.success) {
+
+      if (pendingBotIdRef.current) {
+        removeMessageById(pendingBotIdRef.current);
+        pendingBotIdRef.current = null;
+      }
+
+      if (!data || !data.success || !data.reply) {
         stopAutoScroll();
-        appendMessage({ id: generateUniqueId("error"), role: "error", content: res?.error || "Failed to get response", timestamp: new Date().toISOString() } as Message);
+        appendMessage({
+          id: generateLocalId("error"),
+          role: "error",
+          content: data?.error || "Failed to get response",
+          timestamp: new Date().toISOString(),
+        });
+        Toast.show({ type: "error", text1: "Error", text2: data?.error || "Failed to get response", position: "top", topOffset: 60 });
         return;
       }
-      const aiRaw = (res.data && (res.data as any).reply) || res.data || "No response.";
-      const aiText = typeof aiRaw === "string" ? aiRaw : JSON.stringify(aiRaw);
-      await smoothStreamAI(aiText);
-    } catch (e) {
+      await smoothStreamAI(String(data.reply));
+    } catch (e: any) {
       setIsTyping(false);
       setIsSending(false);
       stopAutoScroll();
-      appendMessage({ id: generateUniqueId("error"), role: "error", content: "An unexpected error occurred", timestamp: new Date().toISOString() } as Message);
+      if (pendingBotIdRef.current) {
+        removeMessageById(pendingBotIdRef.current);
+        pendingBotIdRef.current = null;
+      }
+      appendMessage({
+        id: generateLocalId("error"),
+        role: "error",
+        content: e?.name === "AbortError" ? "Generation stopped" : e?.message || "An unexpected error occurred",
+        timestamp: new Date().toISOString(),
+      });
+      if (e?.name !== "AbortError") {
+        Toast.show({ type: "error", text1: "Error", text2: e?.message || "An unexpected error occurred", position: "top", topOffset: 60 });
+      }
     }
   };
 
@@ -676,6 +757,11 @@ export default function AIDoctorScreen() {
     return () => {
       stopAutoScroll();
       if (typingRafRef.current) cancelAnimationFrame(typingRafRef.current);
+      if (fetchAbortRef.current) {
+        try {
+          fetchAbortRef.current.abort();
+        } catch {}
+      }
     };
   }, []);
 
@@ -723,15 +809,11 @@ export default function AIDoctorScreen() {
       <LinearGradient colors={PAGE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={{ flex: 1 }}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.container}>
-            {/* Header (absolute, shifted down, unified height) */}
+            {/* Header */}
             <View style={styles.header}>
               <View style={styles.headerContent}>
                 <View style={styles.navigationCard}>
-                  <TouchableOpacity
-                    style={styles.backButtonContainer}
-                    onPress={handleBackPress}
-                    activeOpacity={0.7}
-                  >
+                  <TouchableOpacity style={styles.backButtonContainer} onPress={handleBackPress} activeOpacity={0.7}>
                     <Image source={require("../../assets/navigation/left.png")} style={styles.backIcon} contentFit="contain" />
                   </TouchableOpacity>
                   <View style={styles.divider} />
@@ -749,7 +831,6 @@ export default function AIDoctorScreen() {
               </View>
             </View>
 
-            {/* Save/Don’t Save modal with per-button spinner */}
             <SaveChatModal
               visible={showSaveModal}
               onClose={() => setShowSaveModal(false)}
@@ -758,7 +839,6 @@ export default function AIDoctorScreen() {
               savingAction={savingAction}
             />
 
-            {/* History sidebar */}
             <ChatHistoryModal
               visible={showHistory}
               onClose={() => setShowHistory(false)}
@@ -769,11 +849,7 @@ export default function AIDoctorScreen() {
             />
 
             {/* Chat */}
-            <KeyboardAvoidingView
-              style={styles.keyboardView}
-              behavior={Platform.OS === "ios" ? "padding" : "height"}
-              keyboardVerticalOffset={Platform.OS === "ios" ? 96 : 0}
-            >
+            <KeyboardAvoidingView style={styles.keyboardView} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 96 : 0}>
               <View style={styles.chatContainer}>
                 {messages.length === 0 ? (
                   <WelcomeScreen />
@@ -784,15 +860,7 @@ export default function AIDoctorScreen() {
                     keyExtractor={(item) => item.id}
                     renderItem={renderItem}
                     extraData={[messages.length, isTyping]}
-                    refreshControl={
-                      <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        tintColor={COLORS.blue}
-                        colors={[COLORS.blue]}
-                        progressBackgroundColor={COLORS.white}
-                      />
-                    }
+                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.blue} colors={[COLORS.blue]} progressBackgroundColor={COLORS.white} />}
                     contentContainerStyle={[styles.listContent, { paddingTop: LIST_TOP_INSET }]}
                     showsVerticalScrollIndicator={false}
                     keyboardDismissMode="interactive"
@@ -828,31 +896,18 @@ export default function AIDoctorScreen() {
                       </LinearGradient>
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity
-                      style={styles.sendBtnBase}
-                      onPress={() => handleSend()}
-                      disabled={isSending || !hasInput}
-                      activeOpacity={0.85}
-                    >
+                    <TouchableOpacity style={styles.sendBtnBase} onPress={() => handleSend()} disabled={isSending || !hasInput} activeOpacity={0.85}>
                       {isSending || hasInput ? (
                         <LinearGradient colors={USER_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.sendBtnFill}>
                           {isSending ? (
                             <LoadingDots />
                           ) : (
-                            <Image
-                              source={require("../../assets/navigation/send.png")}
-                              style={[styles.sendIcon, { tintColor: COLORS.white }]}
-                              contentFit="contain"
-                            />
+                            <Image source={require("../../assets/navigation/send.png")} style={[styles.sendIcon, { tintColor: COLORS.white }]} contentFit="contain" />
                           )}
                         </LinearGradient>
                       ) : (
                         <View style={[styles.sendBtnFill, styles.sendBtnWhiteFill]}>
-                          <Image
-                            source={require("../../assets/navigation/send.png")}
-                            style={[styles.sendIcon, { tintColor: COLORS.blue }]}
-                            contentFit="contain"
-                          />
+                          <Image source={require("../../assets/navigation/send.png")} style={[styles.sendIcon, { tintColor: COLORS.blue }]} contentFit="contain" />
                         </View>
                       )}
                     </TouchableOpacity>
@@ -869,205 +924,66 @@ export default function AIDoctorScreen() {
 
 const styles = StyleSheet.create({
   splitTextContainer: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center" },
-
-  // Save modal (themed)
   saveChatModalOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.5)", justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
-  saveChatModalContent: {
-    borderRadius: 20,
-    padding: 24,
-    width: "100%",
-    shadowOpacity: 0,
-    elevation: 0,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+  saveChatModalContent: { borderRadius: 20, padding: 24, width: "100%", shadowOpacity: 0, elevation: 0, borderWidth: 1, borderColor: COLORS.border },
   saveChatModalTitle: { fontSize: 20, color: COLORS.charcoal, textAlign: "center", marginBottom: 10, fontFamily: "Inter-Bold" },
   saveChatModalMessage: { fontSize: 14, color: COLORS.gray, textAlign: "center", lineHeight: 20, marginBottom: 20, fontFamily: "Inter-Regular" },
   saveChatModalButtons: { flexDirection: "row", gap: 12 },
-  saveChatModalBtnSecondary: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 44,
-  },
+  saveChatModalBtnSecondary: { flex: 1, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, alignItems: "center", justifyContent: "center", minHeight: 44 },
   saveChatModalBtnSecondaryText: { fontSize: 15, color: COLORS.charcoal, fontFamily: "Inter-SemiBold" },
-  saveChatModalBtnPrimary: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: COLORS.blue,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 44,
-  },
+  saveChatModalBtnPrimary: { flex: 1, paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, backgroundColor: COLORS.blue, alignItems: "center", justifyContent: "center", minHeight: 44 },
   saveChatModalBtnPrimaryText: { fontSize: 15, color: COLORS.white, fontFamily: "Inter-SemiBold" },
-
-  // Shimmer skeleton
   skeletonRow: { height: 44, justifyContent: "center", paddingHorizontal: 16, marginBottom: 8 },
   skeletonBlock: { height: 16, borderRadius: 8, backgroundColor: "#ECEFF3", overflow: "hidden" },
   skeletonShimmer: { position: "absolute", top: 0, bottom: 0, width: 120, backgroundColor: "rgba(255,255,255,0.75)" },
-
-  // Sidebar (full gradient; transparent rows)
   sidebarModalOverlay: { flex: 1, flexDirection: "row" },
   sidebarOverlayTouchable: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.5)" },
-  sidebarContent: {
-    width: screenWidth * 0.85,
-    maxWidth: 320,
-    height: "100%",
-    position: "absolute",
-    left: 0,
-    top: 0,
-    backgroundColor: "transparent",
-    borderRightWidth: 1,
-    borderRightColor: COLORS.border,
-  },
+  sidebarContent: { width: screenWidth * 0.85, maxWidth: 320, height: "100%", position: "absolute", left: 0, top: 0, backgroundColor: "transparent", borderRightWidth: 1, borderRightColor: COLORS.border },
   sidebarGradientFull: { flex: 1 },
-  sidebarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
+  sidebarHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 12 },
   sidebarTitle: { fontSize: 18, color: COLORS.charcoal, fontFamily: "Inter-SemiBold" },
   sidebarCloseBtn: { width: CONTROL_HEIGHT, height: CONTROL_HEIGHT, borderRadius: CONTROL_RADIUS, alignItems: "center", justifyContent: "center" },
   closeIcon: { width: 22, height: 22 },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center", padding: 20 },
   emptyText: { fontSize: 16, color: COLORS.gray, fontFamily: "Inter-Regular" },
   sidebarChatList: { paddingTop: 8, paddingBottom: 12 },
-  sidebarChatItem: {
-    backgroundColor: "transparent",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "rgba(16,15,21,0.08)",
-  },
+  sidebarChatItem: { backgroundColor: "transparent", paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "rgba(16,15,21,0.08)" },
   sidebarChatItemContent: { flex: 1 },
   sidebarChatTitle: { fontSize: 15, color: COLORS.charcoal, fontFamily: "Inter-Medium" },
-
-  // Page containers
   safeArea: { flex: 1, backgroundColor: "transparent" },
   container: { flex: 1, backgroundColor: "transparent", position: "relative" },
-
-  // Header (absolute overlay, unified height)
-  header: {
-    position: "absolute",
-    top: HEADER_TOP_OFFSET,
-    left: 12,
-    right: 12,
-    backgroundColor: "transparent",
-    zIndex: 20,
-  },
+  header: { position: "absolute", top: HEADER_TOP_OFFSET, left: 12, right: 12, backgroundColor: "transparent", zIndex: 20 },
   headerContent: { paddingHorizontal: 0 },
-  navigationCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.white,
-    borderRadius: CONTROL_RADIUS,
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-    alignSelf: "flex-start",
-    width: undefined,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    height: CONTROL_HEIGHT,
-  },
+  navigationCard: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.white, borderRadius: CONTROL_RADIUS, paddingVertical: 4, paddingHorizontal: 4, alignSelf: "flex-start", width: undefined, borderWidth: 1, borderColor: COLORS.border, height: CONTROL_HEIGHT },
   backButtonContainer: { width: CONTROL_HEIGHT - 8, height: CONTROL_HEIGHT - 8, borderRadius: (CONTROL_HEIGHT - 8) / 2, alignItems: "center", justifyContent: "center" },
   backIcon: { width: 20, height: 20 },
   divider: { width: 1, height: CONTROL_HEIGHT - 16, backgroundColor: COLORS.border, marginHorizontal: 8 },
   historyButtonInline: { width: CONTROL_HEIGHT - 8, height: CONTROL_HEIGHT - 8, borderRadius: (CONTROL_HEIGHT - 8) / 2, alignItems: "center", justifyContent: "center" },
   historyIcon: { width: 20, height: 20 },
-
-  // Chat area
   keyboardView: { flex: 1, backgroundColor: "transparent" },
   chatContainer: { flex: 1, position: "relative", backgroundColor: "transparent" },
   welcomeContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 32 },
   welcomeTitle: { fontSize: 28, color: COLORS.charcoal, letterSpacing: -0.5, fontFamily: "Inter-Bold" },
   welcomeDisclaimer: { fontSize: 14, color: COLORS.gray, textAlign: "center", lineHeight: 22, paddingHorizontal: 8, marginTop: 20, fontFamily: "Inter-Regular" },
-
-  // List content
   listContent: { paddingHorizontal: 12, paddingBottom: 16, flexGrow: 1 },
-
   msgRow: { marginVertical: 6, flexDirection: "row", alignItems: "flex-end" },
   msgLeft: { justifyContent: "flex-start", maxWidth: "82%" },
   msgRight: { justifyContent: "flex-end", alignSelf: "flex-end", maxWidth: "82%" },
-
-  // Bubble containers
   bubbleOuter: { borderRadius: CONTROL_RADIUS },
-  bubbleGradient: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: CONTROL_RADIUS,
-    justifyContent: "center",
-  },
+  bubbleGradient: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: CONTROL_RADIUS, justifyContent: "center" },
   botBubble: { alignSelf: "flex-start" },
   userBubble: { alignSelf: "flex-end", minHeight: CONTROL_HEIGHT },
   errorBubble: { backgroundColor: "#FEE2E2", borderColor: "#FCA5A5", borderWidth: 1, borderRadius: CONTROL_RADIUS },
-
   bubbleText: { fontSize: 14, lineHeight: 20, letterSpacing: 0.1, fontFamily: "Inter-Regular" },
   botText: { color: COLORS.charcoal },
   userText: { color: COLORS.white },
-
-  // Input: bordered only; height equals CONTROL_HEIGHT
-  inputContainer: {
-    backgroundColor: "transparent",
-    position: "relative",
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: Platform.OS === "ios" ? 12 : 14,
-    zIndex: 1,
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  input: {
-    flex: 1,
-    color: COLORS.charcoal,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: CONTROL_RADIUS,
-    paddingHorizontal: 14,
-    paddingVertical: 0,
-    height: CONTROL_HEIGHT,
-    fontSize: 16,
-    lineHeight: 22,
-    fontFamily: "Inter-Regular",
-  },
-  sendBtnBase: {
-    marginLeft: 8,
-    width: CONTROL_HEIGHT,
-    height: CONTROL_HEIGHT,
-    borderRadius: CONTROL_RADIUS,
-    overflow: "hidden",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  sendBtnFill: {
-    width: "100%",
-    height: "100%",
-    borderRadius: CONTROL_RADIUS,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sendBtnWhiteFill: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
+  inputContainer: { backgroundColor: "transparent", position: "relative", paddingHorizontal: 16, paddingTop: 8, paddingBottom: Platform.OS === "ios" ? 12 : 14, zIndex: 1 },
+  inputWrapper: { flexDirection: "row", alignItems: "center", backgroundColor: "transparent" },
+  input: { flex: 1, color: COLORS.charcoal, backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border, borderRadius: CONTROL_RADIUS, paddingHorizontal: 14, paddingVertical: 0, height: CONTROL_HEIGHT, fontSize: 16, lineHeight: 22, fontFamily: "Inter-Regular" },
+  sendBtnBase: { marginLeft: 8, width: CONTROL_HEIGHT, height: CONTROL_HEIGHT, borderRadius: CONTROL_RADIUS, overflow: "hidden", justifyContent: "center", alignItems: "center", backgroundColor: "transparent" },
+  sendBtnFill: { width: "100%", height: "100%", borderRadius: CONTROL_RADIUS, justifyContent: "center", alignItems: "center" },
+  sendBtnWhiteFill: { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border },
   sendIcon: { width: 18, height: 18 },
-
-  // Dots loader (send state)
   loadingDotsContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", height: 20 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.white, marginHorizontal: 3 },
 });
